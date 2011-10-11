@@ -11,8 +11,8 @@ then
 	exit 2
 elif [ -x "/usr/bin/nm-tool" ]
 then
-    nm-tool # TODO
-    exit 2
+    nm-tool | sed -ne '/\s\+\*\(Imperial-WPA\|eduroam\)/q1' &&
+	exit 2
 else
     echo "Warning: Could not find wicd-cli or nm-tool." 1>&2
     echo -e "\tPerforming ping anyway." 1>&2
@@ -24,3 +24,4 @@ gateway="$(/sbin/route -n | /bin/sed -ne 's:^0.0.0.0\s\+\([0-9\.]\+\).*:\1:p')"
 ping -c1 -q ${gateway} 1>&2 >/dev/null ||
     echo "Error: Could not ping gateway." 1>&2
 
+#date "+[%F %T] pinged $gateway with 1 packet." >> /home/tom/.log/keepalive.log

@@ -73,7 +73,7 @@ def get_projects(page, stream=None, sort='id'):
                 p_dict = {'id': int(v)}
             elif k == 'supervisor':
                 # Supervisor also has 'Room' and 'Email' fields
-                for f in ': '.join((k, v)).split('&nbsp; '):
+                for f in ': '.join((k, strip_html(v))).split('&nbsp; '):
                     k, v = f.split(':', 1)
                     p_dict[key(k)] = v.strip().replace('<br>', '')
                 log.debug(u"Project {id} is run by {supervisor}." 
