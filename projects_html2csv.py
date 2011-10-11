@@ -79,7 +79,7 @@ def get_projects(page, stream=None, sort='id'):
                 log.debug(u"Project {id} is run by {supervisor}." 
                                 .format(**p_dict))
             else:
-                p_dict[key(k)] = strip_html(v.strip() #.replace('\n\r',''))
+                p_dict[key(k)] = strip_html(v.strip()) #.replace('\n\r',''))
                 log.debug(u"Add {0}: '{1}' to project {2}."
                                 .format(k, p_dict[k], p_dict['id']))
     if sort:
