@@ -1,9 +1,0 @@
-#!/bin/sh
-# Small script to setup my dual display as I want
-/usr/bin/xrandr --noprimary \
-    --output LVDS1 --auto --pos 0x0 --rotate normal \
-    --output VGA1 --auto --below LVDS1
-#sleep 5
-#/usr/bin/pgrep xfce4-panel >/dev/null &&
-    #/usr/bin/xfce4-panel --restart
-
