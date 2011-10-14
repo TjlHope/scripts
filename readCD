@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [ "$1" == "" ] || [ "$1" == "--help" ] || [ "$1" == "-h" ] || [ "$1" == "-?" ] || [ "$2" == "--help" ] || [ "$2" == "-h" ] || [ "$2" == "-?" ] 
+then
+	echo;echo "Usage: $0 cdBlockDevice [OutputFileName]";echo
+	echo "	exit status:"
+	echo "		0	All's good"
+	echo "		1	Supply CD block device"
+	echo "		2	CD does not have necessary file system info"
+	echo "		3	iso-info command not found in PATH";echo
+	exit $( (( "$1" )) )
+fi
+
+[ "$infocmd" ] || infocmd="$(which isoinfo 2>/dev/null)"
+[ "$infocmd" ] || infocmd="$(which iso-info 2>/dev/null)"
+[ "$infocmd" ] || exit 3
+
+[[ -b $1 ]] || exit 1
+
+volnm="$2"
+[ $volnm ] || volnm=$($infocmd -d -i $1 2>/dev/null | sed -n 's/^Volume id:[ ]*\([^ ]*\).*/\1.iso/p' )
+[ $volnm ] || exit 2
+
+blksz=$($infocmd -d -i $1 2>/dev/null | sed -n 's/^Logical block size is:[ ]*\([0-9]*\).*$/\1/p' )
+[ $blksz ] || exit 2
+
+blkcnt=$($infocmd -d -i $1 2>/dev/null | sed -n 's/^Volume size is:[ ]*\([0-9]*\).*$/\1/p' )
+[ $blkcnt ] || exit 2
+
+echo "dd if=$1 of=$volnm bs=$blksz count=$blkcnt conv=notrunc,noerror"
+dd if=$1 of=$volnm bs=$blksz count=$blkcnt conv=notrunc,noerror
+
