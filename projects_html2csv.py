@@ -30,11 +30,11 @@ def get_page(stream=None, user=None, passwd=None, **kwargs):
         url += '?stream=' + stream
     # Try to get responce
     try:
-        page = ic.form_redirect(url, user, passwd)
+        responce = ic.form_redirect(url, user, passwd)
     except ic.HTTPError:
         # If error, exit
         sys.exit(2)
-    return page
+    return responce.read()
 
 
 def get_projects(page, stream=None, sort='id'):
