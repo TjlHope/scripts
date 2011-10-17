@@ -3,12 +3,12 @@
 """
 
 import sys
-import re
 import logging
 from collections import namedtuple
 
 from misc import argparse_, ic, output
 from misc.wrappers import key, strip_html
+
 
 def parse(argv=sys.argv[1:]):
     parser = argparse_.AuthArgumentParser(description=__doc__)
@@ -20,6 +20,7 @@ def parse(argv=sys.argv[1:]):
     args = parser.parse_args(argv)
     return args
 
+
 def get_page(stream=None, user=None, passwd=None, **kwargs):
     """ Fetch projavail page from Imperial EEE intranet and return the html.
     """
@@ -30,10 +31,11 @@ def get_page(stream=None, user=None, passwd=None, **kwargs):
     # Try to get responce
     try:
         page = ic.form_redirect(url, user, passwd)
-    except ic.HTTPError as err:
+    except ic.HTTPError:
         # If error, exit
         sys.exit(2)
     return page
+
 
 def get_projects(page, stream=None, sort='id'):
     """ Parse the html page to extract the data for each project.
@@ -41,7 +43,8 @@ def get_projects(page, stream=None, sort='id'):
     log = logging.getLogger('ParseHTML')
     # Stream dependent initialization
     p_fields = ['id', 'supervisor', 'room', 'email', 'title', 'description']
-    if not stream: p_fields.insert(4, 'streams')
+    if not stream:
+        p_fields.insert(4, 'streams')
     # Container definition
     Project = namedtuple('Project', p_fields)
     # Default project entry
@@ -61,13 +64,14 @@ def get_projects(page, stream=None, sort='id'):
                 log.info(u'Ignoring invalid field: """\n{0}\n"""'
                         .format(field))
                 continue
-            # Get field names to fit 'Project._fields' 
+            # Get field names to fit 'Project._fields'
             k = key(k[3:])
             if k == 'projectid':
                 try:
                     log.info(u"Add project {id}: {title}".format(**p_dict))
                     projects.append(project_def._replace(**p_dict))
-                except UnboundLocalError: pass
+                except UnboundLocalError:
+                    pass
                 # ... and init new
                 log.debug(u"Initiate project {0}.".format(v))
                 p_dict = {'id': int(v)}
@@ -76,10 +80,10 @@ def get_projects(page, stream=None, sort='id'):
                 for f in ': '.join((k, strip_html(v))).split('&nbsp; '):
                     k, v = f.split(':', 1)
                     p_dict[key(k)] = v.strip().replace('<br>', '')
-                log.debug(u"Project {id} is run by {supervisor}." 
+                log.debug(u"Project {id} is run by {supervisor}."
                                 .format(**p_dict))
             else:
-                p_dict[key(k)] = strip_html(v.strip()) #.replace('\n\r',''))
+                p_dict[key(k)] = strip_html(v.strip())  # .replace('\n\r',''))
                 log.debug(u"Add {0}: '{1}' to project {2}."
                                 .format(k, p_dict[k], p_dict['id']))
     if sort:
@@ -102,4 +106,3 @@ if __name__ == '__main__':
     page = get_page(**args.__dict__)
     projects = get_projects(unicode(page, 'latin-1'), args.stream)
     output.table(projects, args.output)
-
