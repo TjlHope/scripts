@@ -60,7 +60,7 @@ case "$(/bin/basename $0)" in
 		    cd "$y"
 		    /usr/local/bin/get_iplayer --nopurge -g "^$series_name"
 		    cd -
-		    ) >/dev/null &
+		    ) &>/dev/null &
 		    (( number_series+=1 ))
 		fi
 	    done
