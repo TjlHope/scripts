@@ -90,6 +90,6 @@ done
 
 # Execute find | sort
 #echo "find $pre_opts $paths -name $name_regexp $@" 
-/usr/bin/find ${opts} ${paths} -name "${pattern}" ${xfind} ${@} \
+exec /usr/bin/find ${opts} ${paths} -name "${pattern}" ${xfind} ${@} \
     | /bin/sort ${xsort}
 
