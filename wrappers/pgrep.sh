@@ -3,8 +3,8 @@
 #prog=${1:?No matching criteria specified.}
 prog=${1}
 
-[ -z ${prog} -o ${prog} = '-h' ] && {
-    echo "Usage: $0 {PATTERN}" >&2
+[ -z "${prog}" -o "${prog}" = '-h' ] && {
+    echo "Usage: ${0} PATTERN" >&2
     exit
 }
 
