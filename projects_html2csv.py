@@ -30,8 +30,8 @@ def get_page(stream=None, user=None, passwd=None, **kwargs):
         url += '?stream=' + stream
     # Try to get responce
     try:
-        responce = ic.form_redirect(url, user, passwd)
-    except ic.HTTPError:
+        responce = ic.formopen(url, user, passwd)
+    except ic.Error:
         # If error, exit
         sys.exit(2)
     return responce.read()
