@@ -1,18 +1,27 @@
-#!/bin/bash
+#!/bin/sh
 
 batLoc="/sys/class/power_supply/BAT1"
 cCharge=$(cat ${batLoc}/charge_now)
 fCharge=$(cat ${batLoc}/charge_full)
 dCharge=$(cat ${batLoc}/charge_full_design)
-pCharge=$(($cCharge * 100 / $fCharge))
-lCharge=$(($fCharge * 100 / $dCharge))
+pCharge=$((${cCharge} * 100 / ${fCharge}))
+lCharge=$((${fCharge} * 100 / ${dCharge}))
 
-case $1 in
-    '')	    echo "$pCharge %";;
-    '-v')   echo "$cCharge / $fCharge = $pCharge %";;
-    '-f')   echo "current: $cCharge; full: $fCharge; design: $dCharge; %: $pCharge.";;
-    '-l')   echo "life: $fCharge / $dCharge = $lCharge %";;
-    *)	    echo "Usage: $0 [-v|-f|-l]";;
+case "${1}" in
+    '')
+	echo "${pCharge} %"
+	;;
+    '-v')
+	echo "${cCharge} / ${fCharge} = ${pCharge} %"
+	;;
+    '-f')
+	echo "current: ${cCharge}; full: ${fCharge}; design: ${dCharge}; %: ${pCharge}."
+	;;
+    '-l')
+	echo "life: ${fCharge} / ${dCharge} = ${lCharge} %"
+	;;
+    *)
+	echo "Usage: ${0} [-v|-f|-l]"
+	;;
 esac
 
-#batt='echo "$(( $(cat /sys/class/power_supply/BAT1/charge_now) * 100 / $(cat /sys/class/power_supply/BAT1/charge_full) )) %"'
