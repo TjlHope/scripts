@@ -12,6 +12,7 @@ case "$(basename ${0})" in
 	;;
     rgrep)
 	sopts="-R"
+	path_def='./'
 	;;
 esac
 
@@ -41,4 +42,4 @@ done
     paths="${paths#* }"
 }
 
-exec /bin/grep --color=auto ${sopts} ${opts} ${patts} ${paths:-./}
+exec /bin/grep --color=auto ${sopts} ${opts} ${patts} ${paths:-${path_def}}
