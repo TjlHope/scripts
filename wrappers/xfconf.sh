@@ -32,6 +32,7 @@ case "${1#-}" in
 	;;
     "refresh"|"r")
 	value="$(${prog} --channel ${channel} --property ${property})"
+	${prog} --channel ${channel} --property ${property} --set 'Default'
 	;;
     *)
 	value="${1}"
