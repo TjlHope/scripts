@@ -4,7 +4,7 @@
 case "$(/bin/basename $0)" in
     "find.iplayer")
 
-	pattern="*[a-z]0[0-9]*.[mf][opl][v4]"
+	pattern="*[a-z]0[0-9]?????_*.[mf][opl][v4]"
 	while [ -n "${1}" ]
 	do
 	    case "${a-${1}}" in
@@ -24,7 +24,7 @@ case "$(/bin/basename $0)" in
 		"-n")
 		    ;;
 		"-p")
-		    pattern="*partial*.[mf][opl][v4]"
+		    pattern="*[a-z]0[0-9]?????_*partial*.[mf][opl][v4]"
 		    ;;
 		"-a")
 		    pattern="*.[mf][opl][v4]"
