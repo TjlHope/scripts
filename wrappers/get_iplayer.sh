@@ -2,12 +2,12 @@
 # TODO: This needs a *Serious* overhall.
 # Key problems:
 #	bash dependent!
-#	runs the get_iplayer scripts too many times
+#	runs the get_iplayer script WAY too many times
 #	need to catch when rtmpdump breaks, and restart it
 #	Use built in pvr?
 
 # check not already running
-/usr/bin/pgrep "$0" >/dev/null && {
+/usr/bin/pgrep "$(basename $0)" >/dev/null && {
     echo "Error: $0 already running."
     exit 1
 }
@@ -17,6 +17,7 @@
     exit 1
 }
 
+prog="/usr/bin/get_iplayer --nopurge"
 # check for iplayer dir - don't allow root for my setup
 [ "$iplayer_dir" ] || iplayer_dir="/home/$USER/Videos/iplayer/"
 [ -d "$iplayer_dir" ] || {
@@ -30,11 +31,22 @@ case "$(/bin/basename $0)" in
 
     ("get_iplayer.series")
 
+	# Allow get_iplayer output
+	if [ "${1}" = '-d' -o "${1}" = '-m' ]
+	then
+	    output="1>&2 >/dev/null &"
+	    shift
+	elif [ "${1}" = '-q' ]
+	then
+	    output="1>&q >/dev/null"
+	    shift
+	fi
+
 	# define temporary files
 	series_file=~/.get_iplayer/series.ls
 	streams_file=~/.get_iplayer/streams.ls
 	# all the programs from iplayer in temp series file
-	/usr/local/bin/get_iplayer --nopurge --series |
+	${prog} --series |
 	    /bin/sed -n 's:  \+([0-9]\+).*$::p' | /usr/bin/uniq >$series_file
 	# number of series streams downloaded set to 0
 	number_streams=0
@@ -58,9 +70,9 @@ case "$(/bin/basename $0)" in
 		    #echo "Downloading new programs for $series_name"
 		    (
 		    cd "$y"
-		    /usr/local/bin/get_iplayer --nopurge -g "^$series_name"
+		    ${prog} -g "^$series_name"
 		    cd -
-		    ) &>/dev/null &
+		    ) ${output}
 		    (( number_series+=1 ))
 		fi
 	    done
@@ -70,9 +82,9 @@ case "$(/bin/basename $0)" in
 		#echo "Downloading new programs for $stream_name"
 		(
 		cd "$x"
-		/usr/local/bin/get_iplayer --nopurge -g "^$stream_name"
+		${prog} -g "^$stream_name"
 		cd -
-		) &>/dev/null &
+		) ${output}
 		(( number_series+=1 ))
 	    fi
 	    (( number_streams+=number_series ))
@@ -87,7 +99,7 @@ case "$(/bin/basename $0)" in
     ("get_iplayer.films")
 
 	cd $iplayer_dir >/dev/null
-	/usr/local/bin/get_iplayer --nopurge -l --category=Films \
+	${prog} -l --category=Films \
 	    --modes=flashhd,flashvhigh "$@"
 	cd - >/dev/null
 
@@ -95,7 +107,7 @@ case "$(/bin/basename $0)" in
 
     ("get_iplayer.live")
 
-	/usr/local/bin/get_iplayer --nopurge --type=livetv,liveradio \
+	${prog} --type=livetv,liveradio \
 	    --stream "$@" --player="mplayer -cache 128 -" 
 
 	;;
