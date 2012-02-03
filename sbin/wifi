@@ -10,7 +10,6 @@
     script_path="$(/bin/readlink --canonicalize "${0}")" ||
     script_path="${0}"
 . "${script_path%/*}/../lib/send_message.sh"
-
 notify_opts="--category=network --hint=string:desktop-entry:wicd-tray "
 icon="wicd-gtk"
 timeout=3
@@ -30,8 +29,9 @@ rf_init () {
 
 modules_init () {
     ### TODO: get possible wireless modules
+    [ ${force-0} -eq 0 ] || [ -n "${wifi_modules}" ] ||
+	wifi_modules="ndiswrapper r8192e_pci"
     #module_search_term="$(lspci | sed -e 
-    wifi_modules="ndiswrapper r8192e_pci"
 }
 
 wifi_init () {
@@ -161,45 +161,46 @@ wifi_start () {
     /bin/sed -ne "/$(echo ${wifi_modules} |
 	    /bin/sed -e 's/ \+/\\|/g')/q1" </proc/modules && {
 	# no wifi module, so insert using /etc/conf.d/modules to find.
-	. /etc/conf.d/modules
-	starting_modules=""
-	release=( $(/bin/uname -r | /bin/sed 's:[\.-]: :g') )
-	# concaternate modules_release variables, most specific first
-	for (( i=${#release[@]}-1; i>=0; i-- ))
+	. "/etc/conf.d/modules"
+	RELEASE="_$(/bin/uname -r | /bin/sed 's:[\.-]:_:g')"
+	# concaternate modules_${release} variables, most specific first
+	release="${RELEASE}"
+	start_mods=''
+	while [ -n "${release}" ]
 	do
-	    sub_release="modules"
-	    for (( j=0; j<=i; j++ ))
-	    do
-		sub_release+="_${release[j]}"
-	    done
-	    starting_modules+="${!sub_release} "
+	    eval 'start_mods="${start_mods}${modules'"${release}"'} "'
+	    release="${release%_*}"
 	done
-	wifi_starting_modules=(
-	    $(echo ${starting_modules} | /bin/grep -oe $(echo ${wifi_modules} |
-		    /bin/sed 's/ \+/ -e /g'))
-	)
+	# extract the modules that load at startup from the wifi modules.
+	wireless_start_mods=''
+	for wireless_mod in ${wifi_modules}
+	do
+	    echo $wireless_mod
+	    echo "${start_mods##*${wireless_mod}*}"
+	    [ -z "${start_mods##*${wireless_mod}*}" ] &&
+		wireless_start_mods="${wireless_start_mods}${wireless_mod} "
+	done
 	# check wireless modules
-	[ ${#wifi_starting_modules[@]} -lt 1 ] && {
+	mods_count=$(echo ${wireless_start_mods} | /bin/wc -w)
+	[ ${mods_count} -lt 1 ] && {
 	    send_message -e "Wifi Start Failed -" "no available modules"
 	    return 1
 	}
-	[ ${#wifi_starting_modules[@]} -lt 1 ] && {
+	[ ${mods_count} -gt 1 ] && {
 	    send_message -w "Multiple modules avaiable," \
 		"loading first for this kernel release."
 	}
-	# get module opts
-	wifi_module_args=""
-	for (( i=${#release[@]}-1; i>=0; i-- ))
+	wireless_mod=${wireless_start_mods%% *}
+	# concaternate modules_${wireless_mod}_${release} arguments
+	release="${RELEASE}"
+	mod_args=''
+	while [ -n "${release}" ]
 	do
-	    sub_release="module_${wifi_starting_modules[0]}"
-	    for (( j=0; j<=i; j++ ))
-	    do
-		sub_release+="_${release[j]}"
-	    done
-	    wifi_module_args+="${!sub_release} "
+	    eval 'mod_args="${mod_args}${modules_'"${wireless_mod}${release}"'} "'
+	    release="${release%_*}"
 	done
 	# load module
-	/sbin/modprobe ${wifi_starting_modules[0]} "${wifi_module_args}" || {
+	/sbin/modprobe ${wireless_mod} ${mod_args} || {
 	    send_message -e "Wifi Start Failed -" "module could not be inserted"
 	    return 1
 	}
