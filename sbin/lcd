@@ -1,0 +1,57 @@
+#!/bin/sh
+# SCRIPTS_DIR/sbin/lcd
+
+[ -h "${0}" ] &&
+    script_path="$(/bin/readlink --canonicalize "${0}")" ||
+    script_path="${0}"
+. "${script_path%/*}/../lib/send_message.sh"
+
+bl_current="/sys/class/*/samsung/brightness"
+bl_max="/sys/class/backlight/*/max_brightness"
+bl_power="/sys/class/backlight/*/bl_power"
+icon="sunny"
+notify_opts="--category=device "
+
+[ -f $bl_current ] && [ -f $bl_max ] && [ -f $bl_power ] && {
+    case "$1" in
+	"up"|"+")
+	    echo "$(( $(cat $bl_current) + 1 ))" > $bl_current
+	    ;;
+	"down"|"-")
+	    echo "$(( $(cat $bl_current) - 1 ))" > $bl_current
+	    ;;
+	[0-9]*)
+	    [ $1 -gt $(cat $bl_max) ] &&
+		echo "$(cat $bl_max)" > $bl_current ||
+		echo "$1" > $bl_current
+	    ;;
+	"on")
+	    echo "0" > $bl_power
+	    exit
+	    ;;
+	"off")
+	    echo "1" > $bl_power
+	    exit
+	    ;;
+	"toggle")
+	    echo $(( ($(cat $bl_power) + 1 ) % 2 )) > $bl_power
+	    exit
+	    ;;
+	*)
+	    echo "Usage: $0 <action>"
+	    echo
+	    echo "ACTIONS"
+	    echo "	up, +		Increase by 1"
+	    echo "	down, -		Decrease by 1"
+	    echo "	0-$(cat $bl_max)		Set level"
+	    echo "	on		Turn backlight on"
+	    echo "	off		Turn backlight off"
+	    echo "	toggle		Toggle backlight on/off"
+	    echo
+	    exit 1
+	    ;;
+    esac
+    send_message "LCD Brightness:" "$(cat $bl_current) / $(cat $bl_max)"
+} || {
+    send_message -e "LCD Brightness control unavailable"
+}

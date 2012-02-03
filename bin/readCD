@@ -1,0 +1,62 @@
+#!/bin/bash
+# SCRIPTS_DIR/bin/readCD
+
+# Usage function, with exit statuses.
+usage () {
+    echo "Usage: ${0} cd_block_device [output_file_name]"
+    echo
+    echo "	exit status:"
+    [ -n "${1}" ] && [ ${1} != 0 ] && [ ${1} != 0 ] ||
+	echo "		0	All's good"
+    [ -n "${1}" ] && [ ${1} != 0 ] && [ ${1} != 1 ] ||
+	echo "		1	Supply CD block device"
+    [ -n "${1}" ] && [ ${1} != 0 ] && [ ${1} != 2 ] ||
+	echo "		2	CD does not have necessary file system info"
+    [ -n "${1}" ] && [ ${1} != 0 ] && [ ${1} != 3 ] ||
+	echo "		3	iso-info command not found in PATH"
+    [ -n "${1}" ] && exit ${1}
+}
+
+# Get parameters.
+while [ -n "${1}" ]
+do
+    case "${1}" in
+	'-?'|'-h'|'--help')
+	    usage 0
+	    ;;
+	*)
+	    [ -z "${cd_dev}" ] &&
+		cd_dev="${1}" ||
+		op_name="${1}"
+	    ;;
+    esac
+    shift
+done
+
+# Check cd is a valid block device.
+[ -b "${cd_dev}" ] || exit 1
+
+# Check we have the iso-info command.
+infocmd="$(which "isoinfo" 2> /dev/null)" ||
+    infocmd="$(which "iso-info" 2> /dev/null)" ||
+    usage 3
+
+# Get the output file name from the CD if not given.
+[ -n "${op_name}" ] ||
+    op_name="$(${infocmd} -d -i ${cd_dev} 2> /dev/null | \
+		/bin/sed -ne 's|^Volumne id:\s*\(\S\+\).*$|\1.iso|p')"
+[ -n "${op_name}" ] || usage 2
+
+# Get the block size from the CD.
+block_size="$(${infocmd} -d -i ${cd_dev} 2> /dev/null | \
+		/bin/sed -n 's|^Logical block size is:\s*\([0-9]\+\).*$|\1|p')"
+[ -n "${block_size}" ] || usage 2
+
+# Get the block count from the CD.
+block_count="$(${infocmd} -d -i ${cd_dev} 2> /dev/null | \
+		/bin/sed -n 's|^Volume size is:\s*\([0-9]\+\).*$|\1|p')"
+[ -n "${blcok_count}" ] || usage 2
+
+# Execute dd command line.
+echo "dd if=${cd_dev} of=${op_name} bs=${block_size} count=${block_count} conv=notrunc,noerror"
+

@@ -1,0 +1,312 @@
+#!/bin/sh
+# SCRIPTS_DIR/sbin/wifi
+
+### starts/stops wireless service
+#	clean up of original wireless_toggle script
+#	TODO: Clean up bashisms in wifi_start
+
+### set up variables
+[ -h "${0}" ] &&
+    script_path="$(/bin/readlink --canonicalize "${0}")" ||
+    script_path="${0}"
+. "${script_path%/*}/../lib/send_message.sh"
+
+notify_opts="--category=network --hint=string:desktop-entry:wicd-tray "
+icon="wicd-gtk"
+timeout=3
+
+### initiate and check rfkill variables
+rf_init () {
+    rf_list="/dev/shm/rf_list" &&
+	/usr/sbin/rfkill list > ${rf_list}
+    rf_control=$(/bin/sed -ne '/[Ww]ifi\|[Ww]ireless/ = ' < ${rf_list})
+    ### check we have control
+    /bin/sed -ne "${rf_control:-0},+2 { /[Hh]ard [Bb]locked.* yes/q1 }" \
+	    < ${rf_list} || {
+	send_message -e "Cannot control Wifi -" "blocked by hardware switch."
+	exit 1
+    }
+}
+
+modules_init () {
+    ### TODO: get possible wireless modules
+    #module_search_term="$(lspci | sed -e 
+    wifi_modules="ndiswrapper r8192e_pci"
+}
+
+wifi_init () {
+    rf_init
+    modules_init
+    # check we can use wicd
+    [ -x /etc/init.d/wicd ] || {
+	send_message -e "Cannot control Wifi -" "wicd not available."
+	exit 1
+    }
+}
+
+wifi_status () {	### check based on wicd, rfkill, and modules
+    /usr/bin/pgrep -x wicd >/dev/null && {	# wicd must be running
+	[ ${rf_control:-0} -gt 0 ] &&	# if we have rf controll can't be blocked
+	    /bin/sed -ne "${rf_control:-0},+2{ /[Ss]oft [Bb]locked.* yes/q1 }" \
+		< ${rf_list} ||
+	    return 1
+	# must be at least 1 wifi module present
+	! $(/bin/sed -ne "/$(echo ${wifi_modules} |
+		/bin/sed 's/ \+/\\|/g')/q1" </proc/modules)
+    }
+}
+
+wifi_stop () {
+    # variables
+    dae=0; mod=0
+    while [ -n "${1}" ]
+    do
+	case "${1}" in
+	    '-d'|'--dae'|'--daemon')
+		dae=1;;
+	    '-m'|'--mod'|'--module')
+		mod=1;;
+	    '-a'|'--all')
+		dae=1; mod=1;;
+	    *)
+		send_message -w "Wifi Stop" "Invalid option: '${1}'";;
+	esac
+	shift
+    done
+    # check its not already stopped
+    [ ${force-0} -gt 0 ] || wifi_status || {
+	send_message -w "Wifi already stopped."
+	return 2
+    }
+    # stop active connections
+    /usr/bin/wicd-cli --wireless --disconnect >/dev/null
+    [ ${rf_control:-0} -gt 0 ] && {
+	# we have rf controll so soft block wifi
+	/usr/sbin/rfkill block wifi 
+	# check
+	rf_init
+	/bin/sed -ne "${rf_control:-0},+2{ /[Ss]oft [Bb]locked.* no/q1 }" \
+		< ${rf_list} && {
+	    send_message -i "Wifi Stop -" "soft blocked Wifi"
+	} || {
+	    send_message -e "Wifi Stop Failed -" "could not soft block Wifi."
+	    [ ${dae} -gt 0 -o ${mod} -gt 0 ] || return 1
+	}
+    } 
+    [ ${dae} -gt 0 -o ${rf_control:-0} -le 0 ] && {
+	# If we don't have rf control first stop daemon
+	/etc/init.d/wicd stop 1>&2 >/dev/null && {
+	    send_message -i "Wifi Stop -" "wicd daemon stopped"
+	}
+	# Check wicd has actually stopped
+	wicd_pid="$(/usr/bin/pgrep -x 'wicd')" && {
+	    sleep "${timeout}"
+	    [ -d "/proc/${wicd_pid}" ] && {
+		send_message -w "Wicd Stop Failed -" "Trying to kill..."
+		/bin/kill ${wicd_pid}
+		sleep "${timeout}"
+		[ -d "/proc/${wicd_pid}" ] &&
+		    send_message -e "Wicd Kill" "Failed." ||
+		    send_message -i "Wicd kill" "was a success."
+	    }
+	}
+	unset wicd_pid
+    }
+    [ ${mod} -gt 0 -o ${rf_control:-0} -le 0 ] && {
+	# If we don't have rf control then remove modules
+	for module in ${wifi_modules} 
+	do
+	    ! /bin/sed -ne "/^${module}/q1" </proc/modules &&
+		/sbin/modprobe -r ${module} >/dev/null
+	done
+	# check
+	/bin/sed -ne "/$(echo "${wifi_modules}" |
+		/bin/sed -e 's/ \+/\\|/g')/q1" </proc/modules && {
+	    send_message -i "Wifi Stop -" "modulues removed"
+	} || {
+	    send_message -e "Wifi Stop Failed -" "modules could not be removed."
+	    #[ ${all} -gt 0 ] || return 1
+	    return 1
+	}
+    }
+    #[ ${all} -gt 0 ] && {
+	#/etc/init.d/wicd stop &>/dev/null && {
+	    #send_message -i "Wifi Stop -" "wicd daemon stopped"
+	#} || {
+	    #send_message -e "Wifi Stop Failed -" "wicd could not stop"
+	    #return 1
+	#}
+    #}
+    send_message "Wifi Stopped."
+}
+
+wifi_start () {
+    [ ${force-0} -gt 0 ] || ! wifi_status || {
+	send_message -w "Wifi already started."
+	return 2
+    }
+    [ ${rf_control:-0} -gt 0 ] && {
+	# we have rf control so soft unblock wifi
+	/usr/sbin/rfkill unblock wifi 
+	# check
+	rf_init
+	/bin/sed -ne "${rf_control:-0},+2{ /[Ss]oft [Bb]locked.* yes/q1 }" \
+		< ${rf_list} && {
+	    send_message -i "Wifi unblocked."
+	} || {
+	    send_message -e "Wifi Start Failed -" "could not unblock Wifi."
+	    return 1
+	}
+    }
+    /bin/sed -ne "/$(echo ${wifi_modules} |
+	    /bin/sed -e 's/ \+/\\|/g')/q1" </proc/modules && {
+	# no wifi module, so insert using /etc/conf.d/modules to find.
+	. /etc/conf.d/modules
+	starting_modules=""
+	release=( $(/bin/uname -r | /bin/sed 's:[\.-]: :g') )
+	# concaternate modules_release variables, most specific first
+	for (( i=${#release[@]}-1; i>=0; i-- ))
+	do
+	    sub_release="modules"
+	    for (( j=0; j<=i; j++ ))
+	    do
+		sub_release+="_${release[j]}"
+	    done
+	    starting_modules+="${!sub_release} "
+	done
+	wifi_starting_modules=(
+	    $(echo ${starting_modules} | /bin/grep -oe $(echo ${wifi_modules} |
+		    /bin/sed 's/ \+/ -e /g'))
+	)
+	# check wireless modules
+	[ ${#wifi_starting_modules[@]} -lt 1 ] && {
+	    send_message -e "Wifi Start Failed -" "no available modules"
+	    return 1
+	}
+	[ ${#wifi_starting_modules[@]} -lt 1 ] && {
+	    send_message -w "Multiple modules avaiable," \
+		"loading first for this kernel release."
+	}
+	# get module opts
+	wifi_module_args=""
+	for (( i=${#release[@]}-1; i>=0; i-- ))
+	do
+	    sub_release="module_${wifi_starting_modules[0]}"
+	    for (( j=0; j<=i; j++ ))
+	    do
+		sub_release+="_${release[j]}"
+	    done
+	    wifi_module_args+="${!sub_release} "
+	done
+	# load module
+	/sbin/modprobe ${wifi_starting_modules[0]} "${wifi_module_args}" || {
+	    send_message -e "Wifi Start Failed -" "module could not be inserted"
+	    return 1
+	}
+    }
+    # check if wicd daemon is running
+    /usr/bin/pgrep -x "wicd" 1>&2 >/dev/null ||
+	/etc/init.d/wicd start 1>&2 >/dev/null && {
+	    send_message -i "Wicd Started..."
+	} || {
+	    send_message -e "Wifi Start Failed -" "wicd could not start"
+	    return 1
+	}
+    # check if wicd client is running
+    [ -n "${XAUTHORITY}" ] && {
+	/usr/bin/pgrep wicd-client >/dev/null ||
+	    sudo -bu ${USER} wicd-client 1>&2 >/dev/null
+	/usr/bin/pgrep wicd-client >/dev/null ||
+	    send_message -w "wicd-client did not start"
+    }
+    send_message "Wifi Started"
+}
+
+wifi_init
+while [ 1 -gt 0 ]
+do
+    case "${1}" in
+	"toggle")
+	    send_message -i "Toggling Wifi..."
+	    shift
+	    wifi_status &&
+		wifi_stop ${@} ||	# It's started, so stop
+		wifi_start ${@}		# It's stopped, so start
+	    ;;
+	"start")
+	    send_message -i "Starting Wifi..."
+	    wifi_start ${@}
+	    ;;
+	"stop")
+	    send_message -i "Stopping Wifi..."
+	    shift
+	    wifi_stop ${@}
+	    ;;
+	"restart")
+	    send_message -i "Restarting Wifi..."
+	    shift
+	    wifi_stop ${@}
+	    sleep "${timeout}"
+	    wifi_start ${@}
+	    ;;
+	"status")
+	    wifi_status &&
+		send_message "Wifi Started" ||
+		send_message "Wifi Stopped"
+	    ;;
+	"-v"|"--verbose")
+	    verbose=1
+	    shift
+	    continue
+	    ;;
+	"-f"|"--force")
+	    force=1
+	    shift
+	    continue
+	    ;;
+	"h"|"-h"|"help"|"-help"|"--help")
+	    echo "Usage: ${0} [opts] <action> [local-opts]"
+	    echo
+	    echo "Controls wifi using wicd and either "
+	    echo "	rfkill or kernel modules."
+	    echo
+	    echo "ACTION"
+	    echo "	toggle  - toggles between states"
+	    echo "	start   - starts necessary sevices"
+	    echo "	stop    - blocks wifi or removes module"
+	    echo "		  -d --daemon	- stop daemon"
+	    echo "		  -m --modules	- remove modules"
+	    echo "		  -a --all	- stop everything"
+	    echo "	restart - performs 'stop' then 'start'"
+	    echo "		  ... as stop"
+	    echo "	status  - shows a status message"
+	    echo
+	    echo "OPTION"
+	    echo "	-h --help"
+	    echo "		prints this help message"
+	    echo "	-v --verbose"
+	    echo "		makes execution more verbose"
+	    echo "	-f --force"
+	    echo "		attempt to force <action>"
+	    echo
+	    exit 0
+	    ;;
+	*)
+	    echo "Usage: ${0} [--help|--verbose] <toggle|start|stop|restart|status>" >&2
+	    exit 1
+	    ;;
+    esac
+    break
+done
+
+### clean up
+unset wifi_start
+unset wifi_stop
+unset wifi_status
+unset rf_control
+[ -f "${rf_list}" ] &&
+    /bin/rm "${rf_list}"
+unset rf_list
+unset icon
+unset notify_opts
+

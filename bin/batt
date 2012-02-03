@@ -1,0 +1,28 @@
+#!/bin/sh
+# SCRIPTS_DIR/bin/batt
+
+location="/sys/class/power_supply/BAT1"
+current=$(cat ${bat_loc}/charge_now)
+full=$(cat ${bat_loc}/charge_full)
+design=$(cat ${bat_loc}/charge_full_design)
+percent=$(( ${cur_charge} * 100 / ${full_charge} ))
+life=$(( ${full_charge} * 100 / ${des_charge} ))
+
+case "${1}" in
+    '')
+	echo "${percent} %"
+	;;
+    '-v')
+	echo "${current} / ${full} = ${percent} %"
+	;;
+    '-f')
+	echo "current: ${current}; full: ${full}; design: ${design}; %: ${percent}."
+	;;
+    '-l')
+	echo "life: ${full} / ${design} = ${life} %"
+	;;
+    *)
+	echo "Usage: ${0} [-v|-f|-l]"
+	;;
+esac
+

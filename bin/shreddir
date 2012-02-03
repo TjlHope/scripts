@@ -1,0 +1,10 @@
+#!/bin/sh
+# SCRIPTS_DIR/bin/shreddir
+
+[ -d $1 ] || {
+    echo "Give directory to shred." 1>&2
+    exit 1
+}
+
+shred -u $(find $1 -type f)
+rmdir $(find $1 -depth -type d )
