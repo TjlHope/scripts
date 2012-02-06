@@ -1,0 +1,90 @@
+#!/bin/sh
+
+PREFIX="/etc"
+dir_prefix="cron"
+
+die () {
+    echo "ERROR:" $@ >&2
+    exit 1
+}
+
+warn () {
+    [ ${verbose-0} -lt 0 ] ||
+	echo "WARNING:" $@ >&2
+}
+
+info () {
+    [ ${verbose-0} -le 0 ] ||
+	echo "INFO:" $@
+}
+
+
+while [ -n "$1" ]
+do
+    if [ -z "${1##-*}" ]
+    then
+
+	# parse opt
+	case "$1" in
+	    '-p'|'--prefix')
+		PREFIX="$2"
+		shift
+		;;
+	    '-d'|'--dir-prefix')
+		dir_prefix="$2"
+		shift
+		;;
+	    '-v'|'--verbose')
+		verbose=$(( ${verbose-0} + 1 ))
+		;;
+	    '-q'|'--quiet')
+		verbose=$(( ${verbose-0} - 1 ))
+		;;
+	    *)
+		warn "Invalid option '$1'."
+		;;
+	esac
+
+    else
+
+	# it's the period definition
+	if [ -z "$period" ]
+	then
+	    period="$1"
+	else
+	    die "Multiple period definitions: '$period' and '$1'."
+	fi
+
+    fi
+    shift
+done
+
+
+[ -n "$period" ] ||
+    die "No period specified."
+
+dir="$PREFIX/$dir_prefix.$period"
+if [ -r "$dir" -a -d "$dir" ]
+then
+
+    for f in "$dir"/*
+    do
+	if [ -r "$f" -a -f "$f" -a -x "$f" -a "$f" = "${f%~}" ]
+	then
+
+	    echo $f
+
+	else
+
+	    [ "$f" = "$dir/*" ] &&
+		info "No scripts in directory: $dir." ||
+		warn "Not a valid script: '$f'."
+
+	fi
+    done
+
+else
+
+    die "Directory doesn't exist or is inaccessible: $dir"
+
+fi
