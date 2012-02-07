@@ -34,11 +34,11 @@ do
 done
 
 # Check cd is a valid block device.
-[ -b "${cd_dev}" ] || exit 1
+[ -b "${cd_dev}" ] || usage 1
 
 # Check we have the iso-info command.
-infocmd="$(which "isoinfo" 2> /dev/null)" ||
-    infocmd="$(which "iso-info" 2> /dev/null)" ||
+infocmd="$(type "isoinfo" > /dev/null 2>&1)" ||
+    infocmd="$(type "iso-info" > /dev/null 2>&1)" ||
     usage 3
 
 # Get the output file name from the CD if not given.

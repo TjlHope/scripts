@@ -22,7 +22,7 @@ fi
 # Find current gateway
 gateway="$(/sbin/route -n | /bin/sed -ne 's:^0.0.0.0\s\+\([0-9\.]\+\).*:\1:p')"
 # Ping it once
-/bin/ping -c1 -q ${gateway} 1>&2 >/dev/null ||
+/bin/ping -c1 -q ${gateway} >/dev/null 2>&1 ||
     echo "Error: Could not ping gateway." 1>&2
 
 date "+[%F %T] pinged $gateway with 1 packet." >> /home/tom/.log/keepalive.log

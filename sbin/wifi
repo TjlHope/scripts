@@ -95,7 +95,7 @@ wifi_stop () {
     } 
     [ ${dae} -gt 0 -o ${rf_control:-0} -le 0 ] && {
 	# If we don't have rf control first stop daemon
-	/etc/init.d/wicd stop 1>&2 >/dev/null && {
+	/etc/init.d/wicd stop >/dev/null 2>&1 && {
 	    send_message -i "Wifi Stop -" "wicd daemon stopped"
 	}
 	# Check wicd has actually stopped
@@ -206,8 +206,8 @@ wifi_start () {
 	}
     }
     # check if wicd daemon is running
-    /usr/bin/pgrep -x "wicd" 1>&2 >/dev/null ||
-	/etc/init.d/wicd start 1>&2 >/dev/null && {
+    /usr/bin/pgrep -x "wicd" >/dev/null 2>&1 ||
+	/etc/init.d/wicd start >/dev/null 2>&1 && {
 	    send_message -i "Wicd Started..."
 	} || {
 	    send_message -e "Wifi Start Failed -" "wicd could not start"
@@ -216,7 +216,7 @@ wifi_start () {
     # check if wicd client is running
     [ -n "${XAUTHORITY}" ] && {
 	/usr/bin/pgrep wicd-client >/dev/null ||
-	    sudo -bu ${USER} wicd-client 1>&2 >/dev/null
+	    sudo -bu ${USER} wicd-client >/dev/null 2>&1
 	/usr/bin/pgrep wicd-client >/dev/null ||
 	    send_message -w "wicd-client did not start"
     }
