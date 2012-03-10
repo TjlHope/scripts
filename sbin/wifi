@@ -7,7 +7,7 @@
 
 ### set up variables
 [ -h "${0}" ] &&
-    script_path="$(/bin/readlink --canonicalize "${0}")" ||
+    script_path="$(/bin/readlink -f "${0}")" ||
     script_path="${0}"
 . "${script_path%/*}/../lib/send_message.sh"
 notify_opts="--category=network --hint=string:desktop-entry:wicd-tray "

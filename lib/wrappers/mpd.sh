@@ -9,8 +9,8 @@
     /usr/bin/sudo /etc/init.d/mpd --quiet start
 
 [ -h "${0}" ] &&
-    script_path="$(/bin/readlink --canonicalize "${0}")" ||
+    script_path="$(/bin/readlink -f "${0}")" ||
     script_path="${0}"
 . "${script_path%/*}/../get_prog.sh"
 
-exec "$(get_prog $(_which --all "${0##*/}"))"
+exec $(get_prog $(_which --all "${0##*/}")) ${@}

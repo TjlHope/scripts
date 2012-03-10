@@ -2,7 +2,7 @@
 # SCRIPTS_DIR/bin/jitsi
 
 [ -h "${0}" ] &&
-    script_path="$(/bin/readlink --canonicalize "${0}")" ||
+    script_path="$(/bin/readlink -f "${0}")" ||
     script_path="${0}"
 
 . "${script_path%/*}/../lib/send_message.sh"
