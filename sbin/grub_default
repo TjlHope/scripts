@@ -1,0 +1,77 @@
+#!/bin/sh
+# SCRIPTS_DIR/sbin/grub_default
+# Enables changing the default grub menu entry to the current kernel version, 
+# and restoring this value back to normal. Useful when going down for hibernate 
+# and ensuring the correct kernel is booted, preventing loss of state.
+
+grub_conf="/boot/grub/menu.lst"
+[ -f "${grub_conf}" ] || {
+    echo "Error: GRUB configuration file not found." >&2
+    exit 1
+}
+
+default_idx="$(sed -n "${grub_conf}" -e "\
+    s:^\s*default\s\+\([0-9]\+\):\1:p
+    ")"
+current_idx_str="$(sed -n "${grub_conf}" -e "\
+    \:^title\s: {
+	:nl; n
+	\:kernel\s.*/boot/[^/]*$(uname -r): {
+	    g; p
+	    q
+	}
+	\:^$: {
+	    g; s:^.*$:&0:; h
+	    t
+	}
+	b nl
+    }\
+    ")"
+current_idx=${#current_idx_str}
+
+while true
+do
+    case "${1}" in
+	"release")
+	    # Use list entry with current kernel version (fallback: default)
+	    ! ${force-false} && [ ${default_idx} -eq ${current_idx} ] &&
+		echo "Current release version is default, not changing." ||
+		sed -i "${grub_conf}" -e "\
+		    s:^\(\(\s*default\s\+\)[0-9]\+\)\s*$:#\1\n\2${current_idx}:
+		    s:^\(\(\s*fallback\s\+\)[0-9]\+\)\s*$:#\1\n\2${default_idx}:
+		    " ||
+		{ echo "Error: GRUB configuration change failed." >&2
+		    exit 1
+		}
+	    ;;
+	"restore")
+	    # Use default (fallback: fallback)
+	    ! ${force-false} && [ ${default_idx} -ne ${current_idx} ] &&
+		echo "Current default is not release version, not changing." || 
+		sed -i "${grub_conf}" -e "\
+		    \:^\(\(#\s*default\s\+\)[0-9]\+\)\s*$: {
+			N
+			s:^#\(\(\s*default\s\+\)[0-9]\+\)\s*\n\2[0-9]\+\s*$:\1:
+		    }
+		    \:^\(\(#\s*fallback\s\+\)[0-9]\+\)\s*$: {
+			N
+			s:^#\(\(\s*fallback\s\+\)[0-9]\+\)\s*\n\2[0-9]\+\s*$:\1:
+		    }
+		    " ||
+		{ echo "Error: GRUB configuration restore failed." >&2
+		    exit 1
+		}
+	    ;;
+	"-f"|"--force")
+	    force=true
+	    shift
+	    continue
+	    ;;
+	*)
+	    echo "usage: $0 [--force] (release|restore)" >&2
+	    exit 1
+	    ;;
+    esac
+    break
+done
+
