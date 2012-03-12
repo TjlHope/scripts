@@ -1,49 +1,74 @@
 #!/bin/sh
 # SCRIPTS_DIR/sbin/lcd
+# Control the lcd backlight, allows the changing of the backlight brightness 
+# and turning the backlight on and off.
 
 [ -h "${0}" ] &&
     script_path="$(/bin/readlink -f "${0}")" ||
     script_path="${0}"
 . "${script_path%/*}/../lib/send_message.sh"
-
-bl_current="/sys/class/*/samsung/brightness"
-bl_max="/sys/class/backlight/*/max_brightness"
-bl_power="/sys/class/backlight/*/bl_power"
-icon="sunny"
+icon="xfpm-brightness-lcd"
+icon_error="xfpm-brightness-lcd-invalid"
 notify_opts="--category=device "
 
-[ -f $bl_current ] && [ -f $bl_max ] && [ -f $bl_power ] && {
-    case "$1" in
+[ -n "${backlight}" ] || {
+    for bl in "${sys_backlight_path:=/sys/class/backlight}"/*
+    do
+	[ -d "${bl}" ] && [ -f "${bl}/type" ] && {
+	    read bl_type < "${bl}/type"
+	    case "${bl_type}" in
+		"platform")
+		    backlight="${bl}"
+		    break
+		    ;;
+		*)
+		    backup="${bl}"
+		    ;;
+	    esac
+	} || {
+	    echo "Invalid backlight: ${bl}" >&2
+	    exit 1
+	}
+    done
+}
+
+bl_brightness="${backlight:-${backup}}/brightness"
+bl_max="${backlight:-${backup}}/max_brightness"
+bl_power="${backlight:-${backup}}/bl_power"
+
+[ -f ${bl_brightness} ] && [ -f ${bl_max} ] && [ -f ${bl_power} ] && {
+    read current < "${bl_brightness}"
+    read max < "${bl_max}"
+    read power < "${bl_power}"
+    case "${1}" in
 	"up"|"+")
-	    echo "$(( $(cat $bl_current) + 1 ))" > $bl_current
+	    current=$(( ${current} + 1 ))
 	    ;;
 	"down"|"-")
-	    echo "$(( $(cat $bl_current) - 1 ))" > $bl_current
+	    current=$(( ${current} - 1 ))
 	    ;;
 	[0-9]*)
-	    [ $1 -gt $(cat $bl_max) ] &&
-		echo "$(cat $bl_max)" > $bl_current ||
-		echo "$1" > $bl_current
+	    [ ${1} -gt ${max} ] &&
+		current=${max} ||
+		current=${1}
 	    ;;
 	"on")
-	    echo "0" > $bl_power
-	    exit
+	    power=0
 	    ;;
 	"off")
-	    echo "1" > $bl_power
-	    exit
+	    power=1
 	    ;;
 	"toggle")
-	    echo $(( ($(cat $bl_power) + 1 ) % 2 )) > $bl_power
+	    power=$(( ! ${power} ))
 	    exit
 	    ;;
 	*)
-	    echo "Usage: $0 <action>"
+	    echo "Usage: ${0} <action>"
 	    echo
 	    echo "ACTIONS"
 	    echo "	up, +		Increase by 1"
 	    echo "	down, -		Decrease by 1"
-	    echo "	0-$(cat $bl_max)		Set level"
+	    echo "	0-${max}	Set level"
 	    echo "	on		Turn backlight on"
 	    echo "	off		Turn backlight off"
 	    echo "	toggle		Toggle backlight on/off"
@@ -51,7 +76,9 @@ notify_opts="--category=device "
 	    exit 1
 	    ;;
     esac
-    send_message "LCD Brightness:" "$(cat $bl_current) / $(cat $bl_max)"
+    echo "${current}" > "${bl_brightness}"
+    send_message "LCD Brightness:" "${current} / ${max}"
+    echo "${power}" > "${bl_power}"
 } || {
-    send_message -e "LCD Brightness control unavailable"
+    send_message -e "LCD Brightness:" "Control Error"
 }

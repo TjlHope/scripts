@@ -1,20 +1,19 @@
 #!/bin/sh
 # SCRIPTS_DIR/lib/send_message.sh
 # Function that sends a message using notify-send if in X, echo otherwise.
+# TODO: use ck-list-sessions as well
 
 send_message () {
-    pre_message=""
-    sm_icon=${icon-dialog-info}
     case "${1}" in
 	"-e")
-	    sm_icon="dialog-error"
-	    pre_message="Error: "
+	    sm_icon="${icon_error-dialog-error}"
+	    pre_message="Error:"
 	    shift
 	    ;;
 	"-w")
 	    [ ${verbose-0} -gt 0 ] || return 0
-	    sm_icon="dialog-warning"
-	    pre_message="Warning: "
+	    sm_icon="${icon_warning-dialog-warning}"
+	    pre_message="Warning:"
 	    shift
 	    ;;
 	"-i")
@@ -22,14 +21,9 @@ send_message () {
 	    shift
 	    ;;
     esac
-    #for w in "$@"
-    #do
-	#echo $w
-    #done
-    #echo "-------"
     [ -n "${XAUTHORITY}" ] &&
 	/usr/bin/sudo -u "${USER}" \
-	    /usr/bin/notify-send --icon=${sm_icon} \
+	    /usr/bin/notify-send --icon=${sm_icon-${icon-dialog-info}} \
 		${notify_opts} "${@}" ||
 	echo ${pre_message} "${@}"
 }
