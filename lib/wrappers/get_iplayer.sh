@@ -28,7 +28,7 @@ case "${0##*/}" in
 	pids=""
 	for category in "${HOME}/.get_iplayer/pvr/"*
 	do
-	    [ -f "${category}" ] && {
+	    [ -f "${category}" ] || {
 		echo "No recordings set for PVR." >&2
 		exit 2
 	    }
