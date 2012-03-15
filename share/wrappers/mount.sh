@@ -1,7 +1,7 @@
 #!/bin/sh
 # SCRIPTS_DIR/lib/wrappers/mount.sh
 
-case "$(basename $0)" in
+case "${0##*/}" in
 
     "mount.e71")
 	# check for directory

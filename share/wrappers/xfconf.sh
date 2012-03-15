@@ -5,7 +5,7 @@
 
 prog="/usr/bin/xfconf-query"
 
-name="$(basename ${0})"
+name="${0##*/}"
 
 # Extract channel and property from command name
 channel="${name%%.*}"

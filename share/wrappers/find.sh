@@ -2,7 +2,7 @@
 # SCRIPTS_DIR/lib/wrappers/find.sh
 
 # Get Wrapper specific Opts:
-case "$(/bin/basename $0)" in
+case "${0##*/}" in
     "find.iplayer")
 
 	pattern="*[a-z]0[0-9a-z][0-9a-z][0-9a-z][0-9a-z][0-9a-z][0-9a-z]*.[mf][opl][v4]"

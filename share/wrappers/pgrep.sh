@@ -9,7 +9,7 @@ prog=${1}
     exit
 }
 
-case "$(basename ${0})" in
+case "${0##*/}" in
     'lpgrep')
 	exec /usr/bin/pgrep -l ${@}
 	;;

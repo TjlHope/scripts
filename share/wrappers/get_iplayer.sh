@@ -16,7 +16,7 @@
 [ -h "${0}" ] &&
     script_path="$(readlink -f "${0}")" ||
     script_path="${0}"
-. "${script_path%/*}/../check_net.sh"
+. "${script_path%/*}/../../lib/check_net.sh"
 
 _iplayer="$(command -v "get_iplayer")"
 LOG="${LOG:-/dev/null}"

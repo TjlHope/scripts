@@ -5,7 +5,7 @@
 prog="/usr/bin/xrandr"
 posistion="below"
 
-case "$(/bin/basename $0)" in
+case "${0##*/}" in
     "display.dual")
 	display='LVDS1'
 	secondary="$(${prog} --query | \

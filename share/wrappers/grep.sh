@@ -7,7 +7,7 @@
 }
 
 # prog specific options
-case "$(basename ${0})" in
+case "${0##*/}" in
     lgrep)
 	sopts="-A 2 -B 2"
 	;;

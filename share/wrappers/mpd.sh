@@ -11,6 +11,6 @@
 [ -h "${0}" ] &&
     script_path="$(/bin/readlink -f "${0}")" ||
     script_path="${0}"
-. "${script_path%/*}/../get_prog.sh"
+. "${script_path%/*}/../../lib/get_prog.sh"
 
 exec $(get_prog $(_which --all "${0##*/}")) ${@}
