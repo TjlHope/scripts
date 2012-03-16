@@ -32,8 +32,8 @@ get_prog () {
     # itself, and uses the md5sum to ensure no duplicates.
     # Typical invocation is :
     #	get_prog $(_which "${0##*/}")
-    script="${1}"
-    script_md5="$(md5sum < "${script}")"
+    local script="${1}"
+    local script_md5="$(md5sum < "${script}")"
     shift
     while [ -n "${1}" ] && [ "$(md5sum < "${1}")" = "${script_md5}" ]
     do

@@ -6,14 +6,14 @@
 send_message () {
     case "${1}" in
 	"-e")
-	    sm_icon="${icon_error-dialog-error}"
-	    pre_message="Error:"
+	    local sm_icon="${icon_error-dialog-error}"
+	    local pre_message="Error:"
 	    shift
 	    ;;
 	"-w")
 	    [ ${verbose-0} -gt 0 ] || return 0
-	    sm_icon="${icon_warning-dialog-warning}"
-	    pre_message="Warning:"
+	    local sm_icon="${icon_warning-dialog-warning}"
+	    local pre_message="Warning:"
 	    shift
 	    ;;
 	"-i")
