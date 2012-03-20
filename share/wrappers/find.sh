@@ -25,7 +25,7 @@ case "${0##*/}" in
 		"-n")
 		    ;;
 		"-p")
-		    pattern="${pattern%%.*}_*partial*.${pattern##*.}"
+		    pattern="${pattern%%.*}.partial*.${pattern##*.}"
 		    ;;
 		"-a")
 		    pattern="*.${pattern##*.}"
