@@ -1,28 +1,62 @@
 #!/bin/sh
 # SCRIPTS_DIR/bin/batt
 
-location="/sys/class/power_supply/BAT1"
-current=$(cat ${bat_loc}/charge_now)
-full=$(cat ${bat_loc}/charge_full)
-design=$(cat ${bat_loc}/charge_full_design)
-percent=$(( ${cur_charge} * 100 / ${full_charge} ))
-life=$(( ${full_charge} * 100 / ${des_charge} ))
+[ -h "${0}" ] &&
+    script_path="$(/bin/readlink -f "${0}")" ||
+    script_path="${0}"
+. "${script_path%/*}/../lib/percent_blocks.sh"
+. "${script_path%/*}/../lib/colour.sh"
 
-case "${1}" in
-    '')
-	echo "${percent} %"
-	;;
-    '-v')
-	echo "${current} / ${full} = ${percent} %"
-	;;
-    '-f')
-	echo "current: ${current}; full: ${full}; design: ${design}; %: ${percent}."
-	;;
-    '-l')
-	echo "life: ${full} / ${design} = ${life} %"
-	;;
-    *)
-	echo "Usage: ${0} [-v|-f|-l]"
-	;;
-esac
+location="/sys/class/power_supply/BAT1"
+current=$(cat ${location}/charge_now)
+full=$(cat ${location}/charge_full)
+design=$(cat ${location}/charge_full_design)
+percent=$(( (${current} * 1000 / ${full} + 5) / 10 ))
+life=$(( (${full} * 1000 / ${design} + 5) / 10 ))
+
+while true
+do
+    case "${1}" in
+	'')
+	    echo "${percent} %"
+	    ;;
+	-v)
+	    echo "${current} / ${full} = ${percent} %"
+	    ;;
+	-f)
+	    echo "current: ${current}; full: ${full}; design: ${design}; %: ${percent}."
+	    ;;
+	-l)
+	    echo "life: ${full} / ${design} = ${life} %"
+	    ;;
+	-b)
+	    echo -n ${fmt}
+	    [ ${width-1} -gt 1 ] &&
+		pc_hblock ${percent} ${width} ||
+		pc_vblock ${percent}
+	    ;;
+	-w*)
+	    [ -z "${1#-w}" ] && shift
+	    width="${1#-w}"
+	    shift; continue
+	    ;;
+	-c*)
+	    [ -z "${1#-c}" ] && shift
+	    set_fg_colour "${1#-c}"
+	    shift; continue
+	    ;;
+	-k*)
+	    [ -z "${1#-k}" ] && shift
+	    set_bg_colour "${1#-k}"
+	    shift; continue
+	    ;;
+	*)
+	    [ -n "${*}" ] &&
+		echo "Invalid: ${*}" >&2
+	    echo "Usage: ${0} [ -v | -f | -l | -b ]" >&2
+	    exit 1
+	    ;;
+    esac
+    break
+done
 

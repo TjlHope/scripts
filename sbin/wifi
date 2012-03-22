@@ -230,9 +230,12 @@ do
 	"toggle")
 	    send_message -i "Toggling Wifi..."
 	    shift
-	    wifi_status &&
-		wifi_stop ${@} ||	# It's started, so stop
+	    if wifi_status
+	    then
+		wifi_stop ${@}		# It's started, so stop
+	    else
 		wifi_start ${@}		# It's stopped, so start
+	    fi
 	    ;;
 	"start")
 	    send_message -i "Starting Wifi..."
