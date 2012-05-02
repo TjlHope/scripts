@@ -30,7 +30,7 @@ rf_init () {
 modules_init () {
     ### TODO: get possible wireless modules
     [ ${force-0} -eq 0 ] || [ -n "${wifi_modules}" ] ||
-	wifi_modules="ndiswrapper r8192e_pci"
+	wifi_modules="rtllib r8192e_pci ndiswrapper "
     #module_search_term="$(lspci | sed -e 
 }
 
@@ -117,11 +117,11 @@ wifi_stop () {
 	for module in ${wifi_modules} 
 	do
 	    ! /bin/sed -ne "/^${module}/q1" </proc/modules &&
-		/sbin/modprobe -r ${module} >/dev/null
+		/sbin/modprobe -r ${module} #>/dev/null
 	done
 	# check
 	/bin/sed -ne "/$(echo "${wifi_modules}" |
-		/bin/sed -e 's/ \+/\\|/g')/q1" </proc/modules && {
+		/bin/sed -e 's/\s\+/\\|/g')/q1" </proc/modules && {
 	    send_message -i "Wifi Stop -" "modulues removed"
 	} || {
 	    send_message -e "Wifi Stop Failed -" "modules could not be removed."
