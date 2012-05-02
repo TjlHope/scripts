@@ -1,0 +1,146 @@
+#!/bin/sh
+# SCRIPTS_DIR/sbin/xtlock
+# Lock X displays, virtual terminals (not controlled by a multiplexer), and 
+# multiplexers.
+# TODO: screen support
+
+## Variables	{{{1
+
+log="${LOG-/dev/stdout}"
+
+[ -h "${0}" ] &&
+    script_path="$(/bin/readlink -f "${0}")" ||
+    script_path="${0}"
+. "${script_path%/*}/../lib/prog.sh"
+. "${script_path%/*}/../lib/expr.sh"
+
+_sudo="sudo -bn"	# background cmd (vlock, etc); fail instead of prompt.
+
+list_cmd="$(command -v 'ck-list-sessions')"
+
+# [un]lock command variables	{{{2
+
+x_cmd="$(first_cmd \
+    'gnome-screensaver-command' 'xscreensaver-command' 'xlock' 'slock')"
+case "${x_cmd##*/}" in
+    'gnome-screensaver-command')
+	lock_x="${x_cmd} --lock"
+	unlock_x="${x_cmd} --deactivate"
+	;;
+    'xscreensaver-command')
+	lock_x="${x_cmd} -lock"
+	unlock_x="${x_cmd} -deactivate"
+	;;
+    'xlock')
+	lock_x="${x_cmd}"
+	unlock_x="${x_cmd} -deactivate"
+	;;
+    *)	lock_x="${x_cmd}";;
+esac
+
+! command xset q | sed -ne \
+    '/^DPMS/{ :top; n
+	/^\s/ {
+	    /[Ee]nabled/ q1
+	    b top
+	}}' &&
+    xset_cmd="$(command -v 'xset') dpms force" && {
+	lock_xset="${xset_cmd} standby"
+	unlock_xset="${xset_cmd} on"
+    }
+
+vt_cmd="$(first_cmd 'vlock' 'busybox' 'lock')"
+case "${vt_cmd##*/}" in
+	'vlock')	lock_vt="${vt_cmd} -an";;
+	'busybox')	lock_vt="${vt_cmd} vlock -an";;
+	'lock')		lock_vt="${vt_cmd} -np";;
+esac
+
+mux_cmd="$(first_cmd 'tmux' 'screen')"
+case "${mux_cmd##*/}" in
+    'tmux')	lock_mux="${mux_cmd} lock-server";;
+    'screen')	lock_mux="${mux_cmd} lock";;		# TODO: screen lock??
+esac
+
+## Sessions	{{{1
+
+# get sessions	{{{2
+# '|' seperates fields, white space seperates sessions...
+
+[ -n "${list_cmd}" ] && {
+    sessions="$(${list_cmd} | sed -ne \
+	"/^Session[0-9]\+:$/ { N
+	    s:^.*unix-user = '\(${rgx_id}\)'.*$:\1|:
+	    N; N; N; N
+	    s:\n.*active = \(${rgx_bool}\).*$:\1|:
+	    N;N
+	    s:\n.*x11-display = '${rgx_xdply}'\s*\n.*x11-display-device = '/dev/\(${rgx_term}\)':X|\1:
+	    N
+	    s:\n.*display-device = '/dev/\(${rgx_term}\)':V|\1:
+	    s:\n.*$::
+	    p}")" # | sort -t '|' -k '1,1')"
+} || { 
+    # TODO: Do something if consolekit not available
+    #		can't be bothered right now.
+    tty_users="$(/bin/ps -e -o 'tty,user,cmd' | /bin/sed -ne \
+	's:^\(tty[0-9]\)\+\s\+\(\w\+\)\s\+.*[-/]\([a-Z]\{,3\}sh\)\(\s.*\)\?$:\2|\1:p')"
+    users="$(echo "$(/usr/bin/users) " | sed -e 's:\(\w\+\)\(.*\s\)\1\s:\1\2:g')"
+    x="$(/usr/bin/pgrep '^X$')"
+}
+
+[ -n "${mux_cmd}" ] &&
+    sessions="${sessions} $(ps -C"${mux_cmd##*/}" -o"user=,pid=,tty=" | \
+	sed -ne \
+	    "s:^\s*\(${rgx_user}\)\s\+\(${rgx_id}\)\s\+\(${rgx_term}\)\s*$:\1|\2|M|\3:p")" 
+
+# process sessions	{{{2
+
+for session in ${sessions}
+do
+    case "${session%|*}" in
+	*X)				# X session?
+	    [ "${session##*|${_true}|*}" = '' ] && {
+		user="$(sed -n /etc/passwd -e \
+		    "s/^\([^:]*\):[^:]*:${session%%|*}:.*/\1/p")"
+		[ "${x_users#*${user}}" = "${x_users}" ] &&
+		    x_users="${x_users} ${user}"
+	    }
+	    ;;
+	*V)				# VT session (that's not muxed)?
+	    [ -n "${sessions##*|M|${session##*|}*}" ] &&
+		[ "${vt_users#*root}" = "${vt_users}" ] && {
+		    [ -z "${session##*|${_true}|*}" ] ||
+			[ -z "${vt_users}" ] || [ "${session%%|*}" = '0' ]
+		} &&
+		vt_users="$(sed -ne \
+		    "s/^\([^:]*\):[^:]*:${session%%|*}:.*/\1/p" /etc/passwd)"
+	    ;;
+	*M)			# MUX session?
+	    user="${session%%|*}"
+	    [ "${mux_users#*${user}}" = "${mux_users}" ] &&
+		mux_users="${mux_users} ${user}"
+	    ;;
+    esac
+done
+
+xset_users="${x_users}"
+
+## Argument processing	{{{1
+
+[ "${1}" = 'lock' ] || [ "${1}" = 'unlock' ] || {
+    echo "usage: ${0} (lock|unlock)"
+    exit 1
+}
+
+for dev in 'x' 'xset' 'mux' 'vt'
+do
+    eval users="\$${dev}_users"
+    for user in ${users}
+    do
+	eval "cmd=\"${_sudo} -u ${user} \${${1}_${dev}-true}\""
+	${cmd} &&
+	    echo "${dev} ${1}ed by ${user}" ||
+	    echo "failed to ${1} ${dev} for ${user}"
+    done
+done
+
