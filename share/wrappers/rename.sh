@@ -2,11 +2,11 @@
 # SCRIPTS_DIR/lib/wrappers/rename.sh
 # TODO: Need to rewrite without bash arrays
 #	Maybe only allow options at start, parse them and $0 to store operation 
-#	as variables (put the the case outside the for loop and store the sed
+#	as variables (put the case outside the for loop and store the sed
 #	script as a variable). Then iterate over the rest of the files using
 #	shift and while [ -n "$1" ] (a la find wrapper)
 
-command_name="$(/bin/basename $0)"
+command_name="${0##*/}"
 declare -a files
 
 # defaults for commands
@@ -72,8 +72,8 @@ case "${command_name}" in
 	    s/%28/(/g
 	    s/%29/)/g
 	    s/%2[Aa]/\\*/g
-	    s/%2[Bb]/\\,/g
-	    s/%2[Cc]/+/g
+	    s/%2[Bb]/+/g
+	    s/%2[Cc]/,/g
 	    s/%2[Dd]/-/g
 	    s/%2[Ee]/\\./g
 	    s/%2[Ff]/\\\//g
@@ -107,7 +107,7 @@ esac
 for file_name in "${files[@]}"
 do
     # Get new name for file
-    new_name="$(echo "${file_name}" | /bin/sed -ne "${sed_expr}")"
+    new_name="$(echo "${file_name}" | sed -ne "${sed_expr}")"
 
     # If substitution fails go on to next name
     [ -n "${new_name}" ] || continue
