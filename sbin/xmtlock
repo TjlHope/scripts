@@ -138,8 +138,8 @@ do
     for user in ${users}
     do
 	eval "cmd=\"${_sudo} -u ${user} \${${1}_${dev}-true}\""
-	${cmd} &&
-	    echo "${dev} ${1}ed by ${user}" ||
+	${cmd} >/dev/null 2>&1 &&
+	    echo "${dev} ${1}ed for ${user}" ||
 	    echo "failed to ${1} ${dev} for ${user}"
     done
 done
