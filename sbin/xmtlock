@@ -38,16 +38,7 @@ case "${x_cmd##*/}" in
     *)	lock_x="${x_cmd}";;
 esac
 
-! command xset q | sed -ne \
-    '/^DPMS/{ :top; n
-	/^\s/ {
-	    /[Ee]nabled/ q1
-	    b top
-	}}' &&
-    xset_cmd="$(command -v 'xset') dpms force" && {
-	lock_xset="${xset_cmd} standby"
-	unlock_xset="${xset_cmd} on"
-    }
+xset_cmd="$(command -v 'xset')"
 
 vt_cmd="$(first_cmd 'vlock' 'busybox' 'lock')"
 case "${vt_cmd##*/}" in
@@ -123,24 +114,58 @@ do
     esac
 done
 
-xset_users="${x_users}"
+[ -n "${xset_cmd}" ] && {
+    dpms_users="${x_users}"
+    ! ${_sudo} -u ${dpms_users%%${IFS}*} "${xset_cmd}" q | sed -ne \
+	'/^DPMS/{ :top; n
+	    /^\s/ {
+		/[Ee]nabled/ q1
+		b top
+	    }}' &&
+    {
+	lock_dpms="${xset_cmd} dpms force standby"
+	unlock_dpms="${xset_cmd} dpms force on"
+    }
+}
 
 ## Argument processing	{{{1
 
-[ "${1}" = 'lock' ] || [ "${1}" = 'unlock' ] || {
-    echo "usage: ${0} (lock|unlock)"
-    exit 1
-}
+# defaults:
+action="lock"
+devs="x mux"
 
-for dev in 'x' 'xset' 'mux' 'vt'
+while [ -n "${1}" ]
+do
+    case "${1}" in
+	'-l'|'-lock'|'--lock')
+	    action="lock"
+	    ;;
+	'-u'|'-unlock'|'--unlock'|'-deactivate'|'--deactivate')
+	    action="unlock"
+	    ;;
+	'x'|'dpms'|'mux'|'vt')
+	    devs="${devs} ${1}"
+	    ;;
+	'all')
+	    devs="x dpms mux vt"
+	    ;;
+	*)
+	    echo "usage: ${0} [-u|-d] (all|x|dpms|mux|vt)" >&2
+	    exit 1
+	    ;;
+    esac
+    shift
+done
+
+for dev in ${devs}
 do
     eval users="\$${dev}_users"
     for user in ${users}
     do
-	eval "cmd=\"${_sudo} -u ${user} \${${1}_${dev}-true}\""
+	eval "cmd=\"${_sudo} -u ${user} \${${action}_${dev}-true}\""
 	${cmd} >/dev/null 2>&1 &&
-	    echo "${dev} ${1}ed for ${user}" ||
-	    echo "failed to ${1} ${dev} for ${user}"
+	    echo "${dev} ${action}ed for ${user}" ||
+	    echo "failed to ${action} ${dev} for ${user}"
     done
 done
 
