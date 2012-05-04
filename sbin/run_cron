@@ -19,6 +19,12 @@ info () {
 }
 
 
+if [ "${0##*.}" != "${0}" ]
+then
+    # name of the form run_cron.period
+    period="${0##*.}"
+fi
+
 while [ -n "$1" ]
 do
     if [ -z "${1##-*}" ]
