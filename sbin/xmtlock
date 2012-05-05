@@ -6,21 +6,25 @@
 
 ## Variables	{{{1
 
-log="${LOG-/dev/stdout}"
+log="${LOG-/dev/stdout}"	# allow overiding with envvar LOG
 
+# source library scripts for program location and expression matching
 [ -h "${0}" ] &&
-    script_path="$(/bin/readlink -f "${0}")" ||
+    script_path="$(readlink -f "${0}")" ||
     script_path="${0}"
 . "${script_path%/*}/../lib/prog.sh"
 . "${script_path%/*}/../lib/expr.sh"
 
-_sudo="sudo -bn"	# background cmd (vlock, etc); fail instead of prompt.
+# commands need to be run as specific users
+priv_cmd="sudo -bnu \${user}"	# also background them; fail rather than prompt
 
 list_cmd="$(command -v 'ck-list-sessions')"
 
-# [un]lock command variables	{{{2
+### [un]lock command variables	{{{2
+# with necessary arguments
 
-x_cmd="$(first_cmd \
+# command for locking the X server
+x_cmd="${priv_cmd} $(first_cmd \
     'gnome-screensaver-command' 'xscreensaver-command' 'xlock' 'slock')"
 case "${x_cmd##*/}" in
     'gnome-screensaver-command')
@@ -38,26 +42,50 @@ case "${x_cmd##*/}" in
     *)	lock_x="${x_cmd}";;
 esac
 
-xset_cmd="$(command -v 'xset')"
+# command for DPMS control
+dpms_cmd="${priv_cmd} $(first_cmd 'xset')"
+case "${dpms_cmd##*/}" in
+    'xset')
+	lock_dpms="${dpms_cmd} dpms force standby"
+	unlock_dpms="${dpms_cmd} dpms force on"
+	dpms_query="! ${dpms_cmd} q | sed -ne \
+			'/^DPMS/{ :top; n
+			    /^\s/ {
+				/[Ee]nabled/ q1
+				b top
+			    }}'"
+	;;
+esac
 
-vt_cmd="$(first_cmd 'vlock' 'busybox' 'lock')"
+# command for locking Virtual Terminals
+vt_cmd="${priv_cmd} $(first_cmd 'vlock' 'busybox' 'lock')"
 case "${vt_cmd##*/}" in
 	'vlock')	lock_vt="${vt_cmd} -an";;
 	'busybox')	lock_vt="${vt_cmd} vlock -an";;
 	'lock')		lock_vt="${vt_cmd} -np";;
 esac
 
-mux_cmd="$(first_cmd 'tmux' 'screen')"
+# commands for locking Terminal Multiplexers	# FIXME: only tmux supported
+mux_cmd="${priv_cmd} $(first_cmd 'tmux' 'screen')"
 case "${mux_cmd##*/}" in
-    'tmux')	lock_mux="${mux_cmd} lock-server";;
-    'screen')	lock_mux="${mux_cmd} lock";;		# TODO: screen lock??
+    'tmux')
+	lock_mux="${mux_cmd} lock-server"
+	list_mux="${mux_cmd} list-clients -F '#{client_tty}'"
+	vt_mux_cmd="${mux_cmd} lock-client -t"
+	;;
+    'screen')		# TODO: screen lock??
+	lock_mux="${mux_cmd} lock"
+	;;
 esac
+# command to only lock Multiplexer clients connected to a Virtual Terminal
+lock_vt_mux="for c in \$(${list_mux}); do [ \"\${c%tty*}\" != \"\${c}\" ] && ${vt_mux_cmd} \${c}; done"
 
 ## Sessions	{{{1
 
-# get sessions	{{{2
+### Get sessions	{{{2
 # '|' seperates fields, white space seperates sessions...
 
+# X and VT sessions
 [ -n "${list_cmd}" ] && {
     sessions="$(${list_cmd} | sed -ne \
 	"/^Session[0-9]\+:$/ { N
@@ -69,22 +97,25 @@ esac
 	    N
 	    s:\n.*display-device = '/dev/\(${rgx_term}\)':V|\1:
 	    s:\n.*$::
-	    p}")" # | sort -t '|' -k '1,1')"
+	    p}")"
 } || { 
     # TODO: Do something if consolekit not available
     #		can't be bothered right now.
-    tty_users="$(/bin/ps -e -o 'tty,user,cmd' | /bin/sed -ne \
+    tty_users="$(ps -e -o 'tty,user,cmd' | sed -ne \
 	's:^\(tty[0-9]\)\+\s\+\(\w\+\)\s\+.*[-/]\([a-Z]\{,3\}sh\)\(\s.*\)\?$:\2|\1:p')"
     users="$(echo "$(/usr/bin/users) " | sed -e 's:\(\w\+\)\(.*\s\)\1\s:\1\2:g')"
     x="$(/usr/bin/pgrep '^X$')"
 }
 
+# MUX sessions
 [ -n "${mux_cmd}" ] &&
-    sessions="${sessions} $(ps -C"${mux_cmd##*/}" -o"user=,pid=,tty=" | \
+    sessions="${sessions} $( \
+	ps -C"${mux_cmd##*/}" -o"user=,pid=,tty=" | \
 	sed -ne \
-	    "s:^\s*\(${rgx_user}\)\s\+\(${rgx_id}\)\s\+\(${rgx_term}\)\s*$:\1|\2|M|\3:p")" 
+	    "s:^\s*\(${rgx_user}\)\s\+\(${rgx_id}\)\s\+\(${rgx_term}\)\s*$:\1|\2|M|\3:p"\
+	)" 
 
-# process sessions	{{{2
+### Process sessions	{{{2
 
 for session in ${sessions}
 do
@@ -93,77 +124,76 @@ do
 	    [ "${session##*|${_true}|*}" = '' ] && {
 		user="$(sed -n /etc/passwd -e \
 		    "s/^\([^:]*\):[^:]*:${session%%|*}:.*/\1/p")"
-		[ "${x_users#*${user}}" = "${x_users}" ] &&
+		[ "${x_users#*${user}}" = "${x_users}" ] && {
 		    x_users="${x_users} ${user}"
+		    eval "${dpms_query}" &&	# X user has DPMS enabled?
+			dpms_users="${dpms_users} ${user}"
+		}
 	    }
 	    ;;
 	*V)				# VT session (that's not muxed)?
-	    [ -n "${sessions##*|M|${session##*|}*}" ] &&
+	    m_tty="|M|${session##*|}"
+	    [ "${sessions#*${m_tty}}" = "${sessions}" ] &&
 		[ "${vt_users#*root}" = "${vt_users}" ] && {
 		    [ -z "${session##*|${_true}|*}" ] ||
 			[ -z "${vt_users}" ] || [ "${session%%|*}" = '0' ]
-		} &&
-		vt_users="$(sed -ne \
-		    "s/^\([^:]*\):[^:]*:${session%%|*}:.*/\1/p" /etc/passwd)"
+		} && {
+		    user="$(sed -n /etc/passwd -e \
+			"s/^\([^:]*\):[^:]*:${session%%|*}:.*/\1/p")"
+		    vt_users="${user}"	# can't lock individually
+		}
 	    ;;
 	*M)			# MUX session?
 	    user="${session%%|*}"
 	    [ "${mux_users#*${user}}" = "${mux_users}" ] &&
 		mux_users="${mux_users} ${user}"
+	    [ "${session##*|tty}" != "${session}" ] &&	# client a VT?
+		[ "${vt_mux_users#*${user}}" = "${vt_mux_users}" ] &&
+		vt_mux_users="${vt_mux_users} ${user}"
 	    ;;
     esac
 done
 
-[ -n "${xset_cmd}" ] && {
-    dpms_users="${x_users}"
-    ! ${_sudo} -u ${dpms_users%%${IFS}*} "${xset_cmd}" q | sed -ne \
-	'/^DPMS/{ :top; n
-	    /^\s/ {
-		/[Ee]nabled/ q1
-		b top
-	    }}' &&
-    {
-	lock_dpms="${xset_cmd} dpms force standby"
-	unlock_dpms="${xset_cmd} dpms force on"
-    }
-}
+## Execution	{{{1
 
-## Argument processing	{{{1
+### Argument processing	{{{2
 
 # defaults:
 action="lock"
-devs="x mux"
+def_devs="x dpms vt_mux"
 
 while [ -n "${1}" ]
 do
     case "${1}" in
-	'-l'|'-lock'|'--lock')
+	'-l'|'-lock'|'--lock'|'-activate'|'--activate')
 	    action="lock"
 	    ;;
 	'-u'|'-unlock'|'--unlock'|'-deactivate'|'--deactivate')
 	    action="unlock"
+	    #def_devs="${def_devs} dpms"	# want dpms with unlock
 	    ;;
-	'x'|'dpms'|'mux'|'vt')
+	'x'|'dpms'|'vt_mux'|'mux'|'vt')
 	    devs="${devs} ${1}"
 	    ;;
 	'all')
 	    devs="x dpms mux vt"
 	    ;;
 	*)
-	    echo "usage: ${0} [-u|-d] (all|x|dpms|mux|vt)" >&2
+	    echo "usage: ${0} [-u|-d] (all|x|dpms|vt_mux|mux|vt)" >&2
 	    exit 1
 	    ;;
     esac
     shift
 done
 
-for dev in ${devs}
+### Iterate and Execute	{{{2
+
+for dev in ${devs-${def_devs}}
 do
     eval users="\$${dev}_users"
     for user in ${users}
     do
-	eval "cmd=\"${_sudo} -u ${user} \${${action}_${dev}-true}\""
-	${cmd} >/dev/null 2>&1 &&
+	eval "eval \${${action}_${dev}-true}" >/dev/null 2>&1 &&
 	    echo "${dev} ${action}ed for ${user}" ||
 	    echo "failed to ${action} ${dev} for ${user}"
     done
