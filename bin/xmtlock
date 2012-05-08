@@ -24,8 +24,8 @@ list_cmd="$(command -v 'ck-list-sessions')"
 # with necessary arguments
 
 # command for locking the X server
-x_cmd="${priv_cmd} $(first_cmd \
-    'gnome-screensaver-command' 'xscreensaver-command' 'xlock' 'slock')"
+x_cmd="${priv_cmd} $(first_cmd 'gnome-screensaver-command' \
+    'xscreensaver-command' 'xlock' 'alock' 'slock')"
 case "${x_cmd##*/}" in
     'gnome-screensaver-command')
 	lock_x="${x_cmd} --lock"
@@ -58,11 +58,12 @@ case "${dpms_cmd##*/}" in
 esac
 
 # command for locking Virtual Terminals
-vt_cmd="${priv_cmd} $(first_cmd 'vlock' 'busybox' 'lock')"
+vt_cmd="${priv_cmd} $(first_cmd 'vlock' 'busybox' 'away' 'lock')"
 case "${vt_cmd##*/}" in
 	'vlock')	lock_vt="${vt_cmd} -an";;
+	'lock')		lock_vt="${vt_cmd} -npv";;
+	#TODO: 'away')		lock_vt="${vt_cmd} ??";;
 	'busybox')	lock_vt="${vt_cmd} vlock -an";;
-	'lock')		lock_vt="${vt_cmd} -np";;
 esac
 
 # commands for locking Terminal Multiplexers	# FIXME: only tmux supported
