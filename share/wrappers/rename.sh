@@ -1,37 +1,37 @@
-#!/bin/bash
+#!/bin/sh
 # SCRIPTS_DIR/lib/wrappers/rename.sh
-# TODO: Need to rewrite without bash arrays
-#	Maybe only allow options at start, parse them and $0 to store operation 
-#	as variables (put the case outside the for loop and store the sed
-#	script as a variable). Then iterate over the rest of the files using
-#	shift and while [ -n "$1" ] (a la find wrapper)
+# Script to rename files using one of several templates: html, spaces, 2nix & 
+# iplayer (for use with my get_iplayer configuration).
 
-command_name="${0##*/}"
-declare -a files
+# TODO:
+#	Change so it can be run (not as a wrapper) specifying more than one 
+#	template, e.g.:
+#		`rename template1[ template2[ ...]] [options] <files>
+#	Add support for user specified regexs?
 
-# defaults for commands
-ask=0
-verbose=0
-perform='y' 
+# defaults for options and exit status
+ask=false
+verbose=false
+perform=true
+xs=0
 
-i=0
 ### parse command line options
-while [ -n "${1}" ]
+while [ "${1#-}" != "${1}" -a ${#} -gt 0 ]
 do
     case "${1}" in
 	"-a"|"--ask")
-	    ask=1;
-	    verbose=1
+	    ask=true
+	    verbose=true
 	    ;;
 	"-p"|"--pret"|"--pretend")
-	    perform='n';
-	    verbose=1
+	    perform=false
+	    verbose=true
 	    ;;
 	"-v"|"--verb"|"--verbose")
-	    verbose=1
+	    verbose=true
 	    ;;
 	"-h"|"-?"|"--help")
-	    echo "Usage: ${0} [options] [files]"
+	    echo "Usage: ${0} [options] <files>"
 	    echo
 	    echo "OPTIONS"
 	    echo "	-v, --verb, --verbose"
@@ -39,26 +39,24 @@ do
 	    echo "	-p, --pret, --pretend"
 	    echo "		Do not perform rename (implies --verbose)."
 	    echo "	-a, --ask"
-	    echo "		Ask before performing renames."
+	    echo "		Ask before performing renames (<y>es/<n>o)," 
+	    echo "		with the option to rename <a>ll, or to"
+	    echo "		<c>ancel/<q>uit/e<x>it (implies --verbose)."
 	    echo
 	    exit 0
 	    ;;
+	"--")	# end of options
+	    shift && break
+	    ;;
 	*)
-	    [ -f "${1}" ] && {
-		files[${i}]="${1}"
-		i=$(( ${i} + 1 )) 
-	    } ||
-		echo "Invalid File: ${1}" >&2
+	    echo "Invalid Option: '${1}'" >&2
 	    ;;
     esac
     shift
 done
 
 # Get sed expresion string for name substitution
-case "${command_name}" in
-    "rename.spaces")
-	sed_expr='/ / s/ /_/gp'
-	;;
+case "${0##*/}" in
     "rename.html")
 	sed_expr='/%[0-9a-fA-F]\{2\}/ {
 		s/%20/\x20/g;		s/%21/\x21/g;
@@ -112,6 +110,16 @@ case "${command_name}" in
 		p
 	    }'
 	;;
+    "rename.spaces")
+	sed_expr='/ / s/ /_/gp'
+	;;
+    "rename.2nix")
+	sed_expr="/[ \`\"'^\*!?,;:=~|&()\[{}<>\\\\]\|]/ {
+		y/ !?,;:=~|&()[]{}<>\\\\/_....----+--------\//
+		s/[\`\"'^\*]//g
+		p
+	    }"
+	;;
     "rename.iplayer")
 	sed_expr='/[a-z]0.\{6\}.*\.m[op][v4]$/ {
 	    s/\(_-\)*_[a-z]0.\{6\}\(_default\)\?//p
@@ -128,38 +136,62 @@ case "${command_name}" in
 	;;
 esac
 
-# Process files
-for file_name in "${files[@]}"
-do
-    # Get new name for file
-    new_name="$(echo "${file_name}" | sed -ne "${sed_expr}")"
 
-    # If substitution fails go on to next name
-    [ -n "${new_name}" ] || continue
+# Process files
+total=${#}
+valid=0
+num=0
+while [ ${#} -gt 0 ]
+do
+
+    # Check we have a valid file
+    [ -f "${1}" ] || {
+	echo "Invalid File: '${1}'" >&2
+	shift && continue
+    }
+
+    # Get new name for file
+    new="$(echo "${1}" | sed -ne "${sed_expr}")"
+
+    # If no new name go on to next name
+    [ -n "${new}" ] &&
+	valid=$(( ${valid} + 1 )) ||
+	{ shift && continue; }
 
     # Output conversion if being verbose
-    [ ${verbose} -gt 0 ] &&
-	echo "${file_name} -> ${new_name}"
+    ${verbose} &&
+	echo "${1}	-> ${new}"
 
-    # If confirmation required...
-    # ... init
-    [ ${ask} -gt 0 ] &&
-	perform=''
-    # ... prompt and check
-    while [[ ! "${perform}" =~ [yY](es)?|[nN]o? ]]
+    # If confirmation required, prompt and check
+    while ${ask}
     do
-	[ "${perform}" ] && echo "Invalid answer: ${perform}"
-	echo -n "Perform rename? (y/n) "
-	read perform
+	read -p "Perform rename? (y/n/a/q) " str
+	case "${str}" in
+	    [Yy]*)	perform=true;;
+	    [Nn]*)	perform=false;;
+	    [Aa]*)	ask=false perform=true;;
+	    [CcQqXx]*)	ask=false perform=false verbose=false;;
+	    *)		echo "Invalid answer: '${str}'" && continue;;
+	esac
+	break
     done
 
     # Perform operation if required.
-    [[ "${perform}" =~ [yY](es)? ]] && {
-	[ "${new_name%/*}" != "${new_name}" ] && {	# only need dir if path
-	    [ -d ${new_name%/*} ] ||
-		mkdir ${new_name%/*}			# needing -p => error
+    ${perform} && {
+	[ "${new%/*}" != "${new}" ] && {	# only need dir if path
+	    [ -d ${new%/*} ] ||
+		mkdir -p ${new%/*}
 	}
-	mv -i "${file_name}" "${new_name}"
+	mv -i "${1}" "${new}" &&		# -i prevents overwrites
+	    num=$(( ${num} + 1 )) ||
+	    xs=$(( ${xs} + ${?} ))
     }
 
+    shift
+
 done
+
+${verbose} && { ${perform} || ${ask}; } &&
+    echo "Renamed ${num} of the ${valid} valid (${total} total) files given."
+
+exit ${xs}
