@@ -10,12 +10,26 @@
 . "${script_path%/*}/../lib/check_type.sh"
 . "${script_path%/*}/../lib/colour.sh"
 
+# Use $SHM_D (if defined) for starage, fallback of /tmp/$USER
+shm_d="${SHM_D:-/tmp/${USER}}"
+{
+    [ -d "${shm_d}" ] || {
+	[ -w "${shm_d%/*}" ] &&
+	    mkdir "${smh_d}"
+    }
+} && {
+    [ -w "${shm_d}" ]
+} || {
+    echo "Error: Cannot access shared memory directory: ${shm_d}." >&2
+    exit 1
+}
+
 cpu_usage () {
     # Function to get current cpu usage, stores the current, and ${1:-inf} 
-    # previous values in ${SHM}/cpu; and outputs the current, and ${1:-0} from 
-    # the file each call.
+    # previous values in ${SHM_D}/cpu; and outputs the current, and ${1:-0} 
+    # from the file each call.
     ## Variables
-    local cpu v a t p _a _t _p fl="${SHM}/cpu"
+    local cpu v a t p _a _t _p fl="${shm_d}/cpu"
     ## Calculate current
     # get the total cpu line from /proc/stat: "IDLE|T1 T2 T3 IDLE T5 ...  TN"
     cpu="$(sed -n /proc/stat -e \
@@ -61,10 +75,10 @@ cpu_usage () {
 
 mem_usage () {
     # Function to get current memory usage, stores the current, and ${1:-inf} 
-    # previous values in ${SHM}/mem; and outputs the current, and ${1:-0} from 
-    # the file each call.
+    # previous values in ${SHM_D}/mem; and outputs the current, and ${1:-0} 
+    # from the file each call.
     ## Variables
-    local mem a t p _a _t _p fl="${SHM}/mem"
+    local mem a t p _a _t _p fl="${shm_d}/mem"
     # check the previous values (defaults if necessary)
     [ -f "${fl}" ] &&
 	read a t p < "${fl}" ||
