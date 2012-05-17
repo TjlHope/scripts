@@ -1,0 +1,149 @@
+#!/bin/sh
+# SCRIPTS_DIR/sbin/xtlock
+# Script to facilitate the command line use of recoll (without the recollq 
+# program).
+
+_recoll="$(command -v recoll)" || {
+    echo "Error: cannot find recoll" >&2
+    exit 1
+}
+
+usage () {
+    echo "Usage:"
+    echo "    ${0} [-c cfg_d] -P [OPTS]"
+    echo "    ${0} [-c cfg_d] [-l|-o|-a|-f] [-t|-g] [OPTS] <DIR> [--|-q] <QUERY>"
+    echo "    ${0} [-h|-?|--help]"
+}
+
+help () {
+    usage
+    cat << __EOF__
+OPTS:
+    -P		Show the date span for all the documents present in the index.
+    -l		Xesam query language search [default].
+    -o		Emulate the GUI simple seach in ANY TERM mode.
+    -a		Emulate the GUI simple seach in ALL TERMS mode.
+    -f		Emulate the GUI simple seach in filename mode.
+    -t		Command line query (no GUI) [default].
+    -g		Open the GUI.
+    -c cfg_d	Specify a configuration, overriding \$RECOLL_CONFDIR.
+    -d		Also dump file contents.
+    -n [first-]<count>	Define the result slice. The default value for [first]
+			is 0. Without the option, the default max count is
+			2000. Use n=0 for no limit.
+    -b		Basic. Just output urls, no mime types or titles.
+    -Q		No result lines, just the processed query and result count.
+    -m		Dump the whole document meta[] array for each result.
+    -A		Output the document abstracts.
+    -S <field>	Sort by field <field>
+    -D		Sort descending.
+    -i <dbdir>	Additional index, several can be given.
+    -e		Use url encoding (%xx) for urls.
+    -F <field list>	Output exactly these fields for each result.
+			The field values are encoded in base64, output in one
+			line and separated by one space character. Use a normal
+			query with option -m to see the field names.
+    --, -q	Force the remainder to be a query
+    -h, -?, --help	Output this help.
+DIR:	The (top) directory to limit the search to [default: current].
+QUERY:	The query can be made up of individual terms, they will all be joined
+	for passing to recoll. Be careful of shell expansion and processing!
+NB: Query language 'phrases' use double quotes ("phrase"), and so need extra
+    quoting to avoid shell expansion (\\"phrase\\"|"\\"phrase"\\"|'"phrase"').
+    To reduce this, a term containing whitespace, or starting with an extra
+    backslash will be quoted as a phrase before passing to recoll, so:
+    "part1 part2" needs no extra quotes, and "\\one:two" only needs one '\\'.
+__EOF__
+}
+
+quote_str () {
+    # Surrounds first argument with double quotes (") if it starts with a 
+    # backslash (\) or contains whitespace
+    [ "${1#*[${IFS}]}" != "${1}" -o "${1#\\}" != "${1}" ] &&
+	echo "\"${1#\\}\"" ||
+	echo "${1}" && false
+}
+
+# Variable definitions and defaults
+gui='-t'
+rqopts=''
+qtype='-l'
+#query=''	# initialised further down
+
+# Parse options
+while [ ${#} -gt 0 ] && [ "${1#-}" != "${1}" -o "${1%/}" != "${1}" ]
+do
+    case "${1}" in
+	-[h?]|--help)
+	    help
+	    exit
+	    ;;
+	-[Poafl])	# query type
+	    qtype="${1}"
+	    ;;
+	-[t])	# graphical user interface will not be started
+	    gui='-t'
+	    ;;
+	-[g])	# prevent the use of the -t flag
+	    gui=''
+	    ;;
+	-[c])	# specifies the configuration directory
+	    local cfg_d="${2}"
+	    shift
+	    ;;
+	-[dbQmADe])	# recollq options
+	    rqopts="${rqopts} ${1}"
+	    ;;
+	-[nSiF])	# recollq options with an argument
+	    rqopts="${rqopts} ${1} ${2}"
+	    shift
+	    ;;
+	*/*)	# directory to search
+	    [ -z "${dir}" ] &&	# don't have one already?
+		dir="${1}" ||	# ... use this one, otherwise
+		break		# ... we're done (start of query)
+	    ;;
+	-[q-])	# force the rest as query
+	    shift
+	    break
+	    ;;
+	*)		# no longer in options, rest is query
+	    break
+	    ;;
+    esac
+    shift
+done
+
+# If there's no query and we're not printing dates, stop now.
+[ ${#} -gt 0 -o ${qtype} != '-l' ] || {
+    usage
+    exit 0
+}
+
+# By default the query is from the current directory.
+query="dir:${dir-${PWD}}"
+
+# Emulate gui query types using the query language:
+case "${qtype}" in	# determine query type
+    -[al])	# AND is the default for query language
+	prefix=''
+	;;
+    -[o])	# OR
+	prefix='OR '
+	query="${query} $(quote_str "${1}")"
+	shift
+	;;
+    -[f])	# FILENAME
+	prefix='filename:'
+	;;
+esac
+
+# Generate the query string
+while [ ${#} -gt 0 ]
+do
+    query="${query} ${prefix}$(quote_str "${1}")"
+    shift
+done
+
+# exec the command
+exec ${_recoll} ${gui} ${cfg_d+-c "${cfg_d}"} ${rqopts} ${qtype} -q "${query}"
