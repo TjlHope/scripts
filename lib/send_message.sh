@@ -11,20 +11,30 @@ send_message () {
 	    shift
 	    ;;
 	"-w")
-	    [ ${verbose-0} -gt 0 ] || return 0
+	    ${verbose} || return 0
 	    local sm_icon="${icon_warning-dialog-warning}"
 	    local pre_message="Warning:"
 	    shift
 	    ;;
 	"-i")
-	    [ ${verbose-0} -gt 0 ] || return 0
+	    ${verbose} || return 0
+	    local pre_message="Info:"
 	    shift
 	    ;;
     esac
     [ -n "${XAUTHORITY}" ] &&
-	/usr/bin/sudo -u "${USER}" \
-	    /usr/bin/notify-send --icon=${sm_icon-${icon-dialog-info}} \
+	command sudo -u "${USER}" \
+	    notify-send --icon=${sm_icon-${icon-dialog-info}} \
 		${notify_opts} "${@}" ||
 	echo ${pre_message} "${@}"
+}
+
+cleanup () {	# dummy function to be overwriten if required
+    exit ${1}
+}
+
+die () {
+    send_message -e "${@}"
+    cleanup 1
 }
 

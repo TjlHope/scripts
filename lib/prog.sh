@@ -31,10 +31,9 @@ get_prog () {
 }
 
 
-# Function to find the first valid program in the argument list, and return 
-# it's full path.
-
 first_cmd () {
+    # Function to find the first valid program in the argument list, and return 
+    # it's full path.
     local cmd
     while [ -n "${1}" ]
     do
@@ -46,5 +45,13 @@ first_cmd () {
     done
     echo 'false'	# in case return value isn't checked
     return 1
+}
+
+first_sys_cmd () {
+    # Wrapper around first_cmd to only use the basic, standard system path 
+    # (ENV_SUPATH from login.defs)
+    local PATH
+    eval "export $(sed -ne 's:^\s*ENV_SUPATH\s\+\(.*\)$:\1:p' < /etc/login.defs)"
+    first_cmd "${@}"
 }
 
