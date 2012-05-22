@@ -4,15 +4,15 @@
 
 _ping="$(command -v ping)" || {
     echo "Cannot find 'ping'" >&2
-    kill -INT $$
+    kill -QUIT ${$}
 }
 
 check_net () {
-    if [ $# -gt 0 ]
+    if [ ${#} -gt 0 ]
     then	# each arg is a address to check
-	while [ -n "$1" ]
+	while [ -n "${1}" ]
 	do
-	    ${_ping} ${_ping_args- -c 1 -W 1} $1 &&
+	    ${_ping} ${_ping_args- -c 1 -W 1} "${1}" >/dev/null 2>&1 &&
 		return 0 ||
 		shift
 	done

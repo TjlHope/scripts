@@ -7,11 +7,6 @@
 #	Want to enable pvr to run in parallel, standard lockfile prevents this.  
 #	Experiment with removing the lockfile, etc.
 
-### check not already running
-/usr/bin/pgrep "${0##*/}" >/dev/null && {
-    echo "Error: $0 already running." >&2
-    exit 1
-}
 ### set up variables
 [ -h "${0}" ] &&
     script_path="$(readlink -f "${0}")" ||
@@ -19,13 +14,20 @@
 . "${script_path%/*}/../../lib/check_net.sh"
 
 _iplayer="$(command -v "get_iplayer")"
-LOG="${LOG:-/dev/null}"
+log="${LOG-/dev/null}"
 
 case "${0##*/}" in
 
-    "get_iplayer.series")
+    "get_iplayer.pvr")
 
+	# FIXME: Hack
+	#	pvr_lock stops pvr running in parallel, so remove it just 
+	#	before running the pvr with a new category. Implement own 
+	#	internal locking mechanism using cat_lock
+	pvr_lock="${HOME}/.get_iplayer/pvr_lock"
+	cat_lock="${HOME}/.get_iplayer/cat_lock"
 	pids=""
+	trap '[ -n "${pids}" ] && kill -INT ${pids}' INT # pass INT to subprocs
 	for category in "${HOME}/.get_iplayer/pvr/"*
 	do
 	    [ -f "${category}" ] || {
@@ -33,13 +35,33 @@ case "${0##*/}" in
 		exit 2
 	    }
 	    (
-		${_iplayer} --pvr "${category##*/}" "${@}" >${LOG} 2>&1 &&
-		    echo "Finished category ${category##*/}." ||
-		    echo "Category ${category##*/} failed." >&2
-	    ) #& FIXME: lockfile pvr stops running in parallel
+		if [ ! -f "${pvr_lock}" ] || {	# not running pvr, or
+			[ -f "${cat_lock}" ] && sed -ne \
+			    "/^\s*${category##*/}\s*$/q1" "${cat_lock}" 
+		    }	# ... not running this category
+		then
+		    # Lock category
+		    echo "${category##*/}" >> "${cat_lock}"
+		    [ -f "${pvr_lock}" ] &&	# remove generic pvr_lock file
+			rm "${pvr_lock}"
+		    # Run PVR for category.
+		    ${_iplayer} --pvr "${category##*/}" "${@}" >"${log}" 2>&1 &&
+			echo "Finished category ${category##*/}." ||
+			echo "Failed to record category ${category##*/}." >&2
+		    # Unlock category
+		    sed -i -e "/^\s*${category##*/}\s*$/d" "${cat_lock}"
+		    num=$(wc -l <"${cat_lock}" 2>"${log}")
+		    [ ${num:-1} -gt 0 ] ||
+			rm "${cat_lock}"	# remove cat_lock file if empty
+		else
+		    echo "Cannot record category ${category##*/}," \
+			"PVR already running." >&2
+		fi
+	    ) &
 	    pids="${pids} ${!}"
 	done
 	wait ${pids}	# Wait for categories to finish before exiting.
+	trap - INT
 
 	;;
 
