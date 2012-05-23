@@ -8,15 +8,15 @@ _recoll="$(command -v recoll)" || {
     exit 1
 }
 
-usage () {
+_usage () {
     echo "Usage:"
     echo "    ${0} [-c cfg_d] -P [OPTS]"
     echo "    ${0} [-c cfg_d] [-l|-o|-a|-f] [-t|-g] [OPTS] <DIR> [--|-q] <QUERY>"
     echo "    ${0} [-h|-?|--help]"
 }
 
-help () {
-    usage
+_help () {
+    _usage
     cat << __EOF__
 OPTS:
     -P		Show the date span for all the documents present in the index.
@@ -66,8 +66,8 @@ quote_str () {
 
 # Variable definitions and defaults
 gui='-t'
-rqopts=''
 qtype='-l'
+rqopts=''
 #query=''	# initialised further down
 
 # Parse options
@@ -75,7 +75,7 @@ while [ ${#} -gt 0 ] && [ "${1#-}" != "${1}" -o "${1%/}" != "${1}" ]
 do
     case "${1}" in
 	-[h?]|--help)
-	    help
+	    _help
 	    exit
 	    ;;
 	-[Poafl])	# query type
@@ -116,7 +116,7 @@ done
 
 # If there's no query and we're not printing dates, stop now.
 [ ${#} -gt 0 -o ${qtype} != '-l' ] || {
-    usage
+    _usage
     exit 0
 }
 
@@ -146,4 +146,9 @@ do
 done
 
 # exec the command
-exec ${_recoll} ${gui} ${cfg_d+-c "${cfg_d}"} ${rqopts} ${qtype} -q "${query}"
+[ "${0##*/}" = 'rq' ] && {
+    exec ${_recoll} ${gui} ${cfg_d+-c "${cfg_d}"} -b ${rqopts} -q "${query}" \
+	| cut -c8-	# just want paths, not 'file://' uris
+} || {
+    exec ${_recoll} ${gui} ${cfg_d+-c "${cfg_d}"} ${rqopts} -q "${query}"
+}
