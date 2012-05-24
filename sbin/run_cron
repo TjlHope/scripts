@@ -1,43 +1,35 @@
 #!/bin/sh
 
-PREFIX="/etc"
+log="${LOG-/dev/null}"
+
+## souce library scripts	{{{1
+[ -h "${0}" ] &&
+    script_path="$(readlink -f "${0}")" ||
+    script_path="${0}"
+. "${script_path%/*}/../lib/output.sh"
+
+## Global Variables		{{{1
+prefix="/etc"
 dir_prefix="cron"
 
-die () {
-    echo "ERROR:" $@ >&2
-    exit 1
-}
+## Process Name and Arguments	{{{1
 
-warn () {
-    [ ${verbose-0} -lt 0 ] ||
-	echo "WARNING:" $@ >&2
-}
+[ "${0##*.}" != "${0}" ]	&&
+    period="${0##*.}"	# name of the form run_cron.period
 
-info () {
-    [ ${verbose-0} -le 0 ] ||
-	echo "INFO:" $@
-}
-
-
-if [ "${0##*.}" != "${0}" ]
-then
-    # name of the form run_cron.period
-    period="${0##*.}"
-fi
-
-while [ -n "$1" ]
+while [ -n "${1}" ]
 do
     if [ -z "${1##-*}" ]
     then
 
 	# parse opt
-	case "$1" in
+	case "${1}" in
 	    '-p'|'--prefix')
-		PREFIX="$2"
+		prefix="${2%/}"
 		shift
 		;;
 	    '-d'|'--dir-prefix')
-		dir_prefix="$2"
+		dir_prefix="${2}"
 		shift
 		;;
 	    '-v'|'--verbose')
@@ -47,50 +39,47 @@ do
 		verbose=$(( ${verbose-0} - 1 ))
 		;;
 	    *)
-		warn "Invalid option '$1'."
+		warn "Invalid option '${1}'."
 		;;
 	esac
 
     else
 
 	# it's the period definition
-	if [ -z "$period" ]
-	then
-	    period="$1"
-	else
-	    die "Multiple period definitions: '$period' and '$1'."
-	fi
+	[ -z "${period}" ]	&&
+	    period="${1}"	||
+	    die "Multiple period definitions: '${period}' and '${1}'."
 
     fi
     shift
 done
 
 
-[ -n "$period" ] ||
+[ -n "${period}" ] ||
     die "No period specified."
 
-dir="$PREFIX/$dir_prefix.$period"
-if [ -r "$dir" -a -d "$dir" ]
+dir="${prefix}/${dir_prefix}.${period}"
+if [ -r "${dir}" -a -d "${dir}" ]
 then
 
-    for f in "$dir"/*
+    for f in "${dir}"/*
     do
-	if [ -r "$f" -a -f "$f" -a -x "$f" -a "$f" = "${f%~}" ]
+	if [ -r "${f}" -a -f "${f}" -a -x "${f}" -a "${f}" = "${f%~}" ]
 	then
 
-	    echo $f
+	    "${f}" >"${log}" 2>&1
 
 	else
 
-	    [ "$f" = "$dir/*" ] &&
-		info "No scripts in directory: $dir." ||
-		warn "Not a valid script: '$f'."
+	    [ "${f}" = "${dir}/*" ] &&
+		info "No scripts in directory: ${dir}." ||
+		warn "Not a valid script: '${f}'."
 
 	fi
     done
 
 else
 
-    die "Directory doesn't exist or is inaccessible: $dir"
+    die "Directory doesn't exist or is inaccessible: ${dir}"
 
 fi

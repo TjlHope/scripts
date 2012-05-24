@@ -30,11 +30,12 @@ send_message () {
 }
 
 cleanup () {	# dummy function to be overwriten if required
-    exit ${1}
+    :
 }
 
 die () {
     send_message -e "${@}"
-    cleanup 1
+    cleanup
+    exit 1
 }
 
