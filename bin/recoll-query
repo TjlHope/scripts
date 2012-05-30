@@ -101,7 +101,7 @@ do
 	*/*)	# directory to search
 	    [ -z "${dir}" ] &&	# don't have one already?
 		dir="${1}" ||	# ... use this one, otherwise
-		break		# ... we're done (start of query)
+		break		# ... done - rest is query
 	    ;;
 	-[q-])	# force the rest as query
 	    shift
@@ -120,8 +120,8 @@ done
     exit 0
 }
 
-# By default the query is from the current directory.
-query="dir:${dir-${PWD}}"
+# Get absolute path for recoll, by default it's the current directory.
+query="dir:$(readlink -f "${dir-${PWD}}")"
 
 # Emulate gui query types using the query language:
 case "${qtype}" in	# determine query type
