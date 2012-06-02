@@ -1,28 +1,27 @@
 #!/bin/sh
 # SCRIPTS_DIR/lib/wrappers/pgrep.sh
 
-#prog=${1:?No matching criteria specified.}
-prog=${1}
+prog="$(command -v pgrep)"
 
-[ -z "${@}" -o "${@#*-h}" != "${@}" ] && {
+[ -z "${*}" -o "${*#*-h}" != "${*}" ] && {
     echo "Usage: ${0} PATTERN" >&2
     exit
 }
 
 case "${0##*/}" in
     'lpgrep')
-	exec /usr/bin/pgrep -l ${@}
+	exec ${prog} -l "${@}"
 	;;
     'cpgrep')
-	for pid in $(/usr/bin/pgrep ${@})
+	for pid in $(${prog} "${@}")
 	do
 	    echo -n "${pid}: "
-	    /bin/sed -e 's/\x0/ /g' /proc/${pid}/cmdline
+	    sed -e 's/\x0/ /g' /proc/${pid}/cmdline
 	    echo
 	done
 	;;
     'fpgrep')
-	exec /usr/bin/pgrep -lf ${@}
+	exec ${prog} -lf "${@}"
 	;;
     *)
 	echo "Invalid program: ${0}" 1>&2

@@ -43,4 +43,4 @@ done
     paths="${paths#*	}"
 }
 
-exec /bin/grep --color=auto ${sopts} ${opts} "${patt}" ${patts} ${paths:-${path_def}}
+exec grep --color=auto ${sopts} ${opts} "${patt}" ${patts} ${paths:-${path_def}}

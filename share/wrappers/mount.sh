@@ -1,20 +1,31 @@
 #!/bin/sh
 # SCRIPTS_DIR/lib/wrappers/mount.sh
 
+# source library scripts 
+[ -h "${0}" ] &&
+    script_path="$(readlink -f "${0}")" ||
+    script_path="${0}"
+. "${script_path%/*}/../../lib/prog.sh"
+. "${script_path%/*}/../../lib/status.sh"
+
 case "${0##*/}" in
 
     "mount.e71")
 	# check for directory
-	[ -d ${HOME}/E71 ] || /bin/mkdir ${HOME}/E71 
+	[ -d ${HOME}/E71 ] || /bin/mkdir "${HOME}/E71" 
+	inc_st
 	# mount with bluetooth
-	obexfs -b 00:25:CF:1F:EE:9B -- ${HOME}/E71
+	obexfs -b 00:25:CF:1F:EE:9B -- "${HOME}/E71"
+	inc_st
 	;;
 
     "umount.e71")
 	# unmount
-	/usr/bin/fusermount -u ${HOME}/E71
+	/usr/bin/fusermount -u "${HOME}/E71"
+	inc_st
 	# remove unneeded directory
-	[ -d ${HOME}/E71 ] && /bin/rmdir ${HOME}/E71
+	[ -d ${HOME}/E71 ] && /bin/rmdir "${HOME}/E71"
+	inc_st
 	;;
 
     "mount.iso")
@@ -86,19 +97,38 @@ case "${0##*/}" in
 	/bin/umount "$1"
 	;;
 	
+    "mount.media")
+	while [ ${#} -gt 0 ] 
+	do
+	    {
+		[ -b "${1}" ] && {
+		    dev="${1}"
+		} || [ -h "/dev/disk/by-label/${1}" ] && {
+		    dev="$(readlink -f "/dev/disk/by-label/${1}")"
+		}
+	    } &&
+		gvfs-mount -d "${dev}" ||
+		inc_st
+	    shift
+	done
+	;;
+
     "umount.media")
 	if [ ${#} -gt 0 ]
 	then
-	    while [ -n "${1}" ]
+	    while [ ${#} -gt 0 ]
 	    do
 		[ -d "${1}" ] &&
-		    gvfs-mount -u "${1}"
+		    gvfs-mount -u "${1}" ||
+		    inc_st
 		shift
 	    done
 	else
-	    for mp in /media/*
+	    for mp in /media/* /run/media/${USER}/*
 	    do
-		gvfs-mount -u "$mp"
+		[ -d "${mp}" ] &&
+		    gvfs-mount -u "$mp" ||
+		    inc_st
 	    done
 	fi
 	;;

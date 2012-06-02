@@ -3,7 +3,7 @@
 # Small script to access the xfconf utility, personally used from changing
 # compositing and theme.
 
-prog="/usr/bin/xfconf-query"
+prog="$(command -v xfconf-query)"
 
 name="${0##*/}"
 

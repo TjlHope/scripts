@@ -2,7 +2,7 @@
 # SCRIPT_DIR/lib/wrappers/display.sh
 # Small script to manipulate the display in several ways.
 
-prog="/usr/bin/xrandr"
+prog="$(command -v xrandr)"
 posistion="below"
 
 case "${0##*/}" in
