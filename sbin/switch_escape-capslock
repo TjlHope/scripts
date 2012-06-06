@@ -1,0 +1,33 @@
+#!/bin/sh
+
+keymap=/lib/udev/keymap
+
+esc_sc=0x01	esc_kc=esc
+cap_sc=0x3A	cap_kc=capslock
+
+usage () {
+    echo "usage: ${0} [switch|normal] [keyboard_event_device]"
+    exit 1
+}
+
+while [ ${#} -gt 0 ]
+do
+    case "${1}" in
+	switch) switch=true;;
+	normal)	switch=false;;
+	*)	evdev="${1}" && break;;
+    esac
+    shift
+done
+
+[ -n "${evdev}" ] ||
+    evdev="$(readlink -f /dev/input/by-path/*-event-kbd)" ||
+    usage
+
+${switch-true} && {
+    ${keymap} "${evdev}" ${esc_sc} ${cap_kc}
+    ${keymap} "${evdev}" ${cap_sc} ${esc_kc}
+} || {
+    ${keymap} "${evdev}" ${esc_sc} ${esc_kc}
+    ${keymap} "${evdev}" ${cap_sc} ${cap_kc}
+}
