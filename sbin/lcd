@@ -60,7 +60,6 @@ bl_power="${backlight:-${backup}}/bl_power"
 	    ;;
 	"toggle")
 	    power=$(( ! ${power} ))
-	    exit
 	    ;;
 	*)
 	    echo "Usage: ${0} <action>"
