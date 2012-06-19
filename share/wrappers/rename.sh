@@ -1,5 +1,5 @@
 #!/bin/sh
-# SCRIPTS_DIR/lib/wrappers/rename.sh
+# SCRIPTS_DIR/share/wrappers/rename.sh
 # Script to rename files using one of several templates: html, spaces, 2nix & 
 # iplayer (for use with my get_iplayer configuration).
 

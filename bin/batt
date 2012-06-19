@@ -2,58 +2,84 @@
 # SCRIPTS_DIR/bin/batt
 
 [ -h "${0}" ] &&
-    script_path="$(/bin/readlink -f "${0}")" ||
-    script_path="${0}"
-. "${script_path%/*}/../lib/percent_blocks.sh"
-. "${script_path%/*}/../lib/colour.sh"
+    script_p="$(readlink -f "${0}")" ||
+    script_p="${0}"
+lib_d="${script_p%/*/*}/lib"
 
-location="/sys/class/power_supply/BAT1"
-current=$(cat ${location}/charge_now)
-full=$(cat ${location}/charge_full)
-design=$(cat ${location}/charge_full_design)
-percent=$(( (${current} * 1000 / ${full} + 5) / 10 ))
-life=$(( (${full} * 1000 / ${design} + 5) / 10 ))
+bat_loc="/sys/class/power_supply/BAT"
+for var in now full full_design
+do
+    for loc in ${bat_loc}*
+    do
+	read v < ${loc}/charge_${var}
+	eval "${var}=\"\${${var}} + ${v}\""
+    done
+    eval "${var}=\"(\${${var}# + })\""
+done
+percent=$(( (${now} * 1000 / ${full} + 5) / 10 ))
+life=$(( (${full} * 1000 / ${full_design} + 5) / 10 ))
 
+usage="Usage: ${0} [-c FG] [-k BG] [-w WIDTH] [-v|-f|-l|-b|-n]"
 while true
 do
     case "${1}" in
 	'')
 	    echo "${percent} %"
 	    ;;
-	-v)
-	    echo "${current} / ${full} = ${percent} %"
+	'-v')
+	    echo "${now} / ${full} = ${percent} %"
 	    ;;
-	-f)
-	    echo "current: ${current}; full: ${full}; design: ${design}; %: ${percent}."
+	'-l')
+	    echo "life: ${full} / ${full_design} = ${life} %"
 	    ;;
-	-l)
-	    echo "life: ${full} / ${design} = ${life} %"
+	'-f')
+	    #echo "current ${now}; full ${full}; design ${full_design}; %: ${percent}"
+	    echo "current: ${now} / ${full}	= ${percent} %"
+	    echo "life:    ${full} / ${full_design}	= ${life} %"
 	    ;;
-	-b)
-	    echo -n ${fmt}
+	'-b')
+	    . "${lib_d}/percent_blocks.sh"
 	    [ ${width-1} -gt 1 ] &&
 		pc_hblock ${percent} ${width} ||
 		pc_vblock ${percent}
 	    ;;
-	-w*)
-	    [ -z "${1#-w}" ] && shift
+	'-n')
+	    . "${lib_d}/notify.sh"
+	    case ${percent} in
+		[0-9])	icon=gpm-battery-000;;
+		[1-2]?)	icon=gpm-battery-020;;
+		[3-4]?)	icon=gpm-battery-040;;
+		[5-6]?)	icon=gpm-battery-060;;
+		[7-8]?)	icon=gpm-battery-080;;
+		9?|100)	icon=gpm-battery-100;;
+	    esac
+	    show "Battery:" "${percent} %"
+	    ;;
+	'-w'*)
+	    [ "${1}" = '-w' ] && shift
 	    width="${1#-w}"
-	    shift; continue
+	    shift && continue
 	    ;;
-	-c*)
-	    [ -z "${1#-c}" ] && shift
+	'-c'*)
+	    . "${lib_d}/colour.sh"
+	    [ "${1}" = '-c' ] && shift
 	    set_fg_colour "${1#-c}"
-	    shift; continue
+	    echo -n "${fmt}"
+	    shift && continue
 	    ;;
-	-k*)
-	    [ -z "${1#-k}" ] && shift
+	'-k'*)
+	    . "${lib_d}/colour.sh"
+	    [ "${1}" = '-k' ] && shift
 	    set_bg_colour "${1#-k}"
-	    shift; continue
+	    echo -n "${fmt}"
+	    shift && continue
+	    ;;
+	'-h'|'-?')
+	    echo "${usage}" >&2
 	    ;;
 	*)
-	    [ -n "${*}" ] &&
-		echo "Invalid: ${*}" >&2
-	    echo "Usage: ${0} [ -v | -f | -l | -b ]" >&2
+	    echo "Invalid: ${*}" >&2
+	    echo "${usage}" >&2
 	    exit 1
 	    ;;
     esac

@@ -2,6 +2,9 @@
 # SCRIPTS_DIR/lib/expr.sh
 # Variables for common glob/regular expression tests
 
+${source_expr-true} &&
+    source_expr=false ||
+    return 0
 
 # booleans
 _true='[Tt][Rr][Uu][Ee]'

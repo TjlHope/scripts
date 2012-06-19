@@ -1,5 +1,5 @@
 #!/bin/sh
-# SCRIPTS_DIR/lib/wrappers/grep.sh
+# SCRIPTS_DIR/share/wrappers/grep.sh
 
 [ -z "${1}" -o "${1}" = '-h' ] && {
     echo "Usage: $0 PATTERN [PATH[ PATH[ ...]]]"

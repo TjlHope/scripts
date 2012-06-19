@@ -1,9 +1,16 @@
 #!/bin/sh
-# SCRIPTS_DIR/lib/wrappers/emerge.sh
+# SCRIPTS_DIR/share/wrappers/emerge.sh
 # TODO: Clean up
 
-res=0
-exit_status=0
+# source library scripts
+[ -h "${0}" ] &&
+    script_p="$(readlink -f "${0}")" ||
+    script_p="${0}"
+lib_d="${script_p%/*/*/*}/lib"
+. "${lib_d}/status.sh"
+. "${lib_d}/output.sh"
+
+_emerge="$(command -v emerge)"
 
 case "${0##*/}" in
 
@@ -11,12 +18,16 @@ case "${0##*/}" in
 
 	# fetch first ops
 	opts=""
-	while [ -n "${1}" ]
+	while [ ${#} -gt 0 ]
 	do
 	    case "${1}" in
 		"--")
 		    shift
 		    break
+		    ;;
+		"-v"|"--verbose")
+		    verbose=true
+		    ops="${ops} ${1}"
 		    ;;
 		"-"*)
 		    ops="${ops} ${1}"
@@ -29,18 +40,19 @@ case "${0##*/}" in
 	done
 
 	### Update
-	/usr/bin/emerge --ask --update --deep --newuse --keep-going \
-	    --exclude "cross-*/*" ${opts} \
-	    ${pkgs:-@world}
-	# update ops
-	res=$? 
-	#echo "	Exit status: $res"
+	ex_pkgs="cross-*/*"
+	vcs_pkgs="$(command eix-installed -a 2>/dev/null \
+	    | sed -ne 's:^\(.*/.*\)-9999\(-r[0-9]\+\)\?$:\1:p')"
+	${_emerge} --ask --update --deep --newuse --with-bdeps=y --keep-going \
+	    ${ex_pkgs:+--exclude ${ex_pkgs}} ${opts} \
+	    ${pkgs:-@world ${vcs_pkgs}}
+	comb_st
+	info "	Emerge exit status: ${st_last}"
 
 	# Catch errors and decide action
-	echo "$ops" | /bin/grep -e "-[^-	]*p" >/dev/null && exit $res
-	[ $res -ne 130 ] && [ $res -ne 102 ] || exit $res
-	#[ $res -eq 0 ] || exit $res
-	exit_status=$(( ${exit_status} + ${res} ))
+	echo "${ops}" | sed -ne "/\(\<-[^-]\?\S*p\|\<--pretend\>\)/q1" &&
+	    [ ${st_last} -ne 130 ] && [ ${st_last} -ne 102 ] ||
+	    exit ${st_total}
 
 	# find necesary module updates
 	update_mods="$(tac /var/log/emerge.log | sed -ne \
@@ -50,37 +62,30 @@ case "${0##*/}" in
 
 	# fetch second ops
 	ops=""
-	while [ -n "${1}" ]
+	while [ ${#} -gt 0 ]
 	do
-	    if [ "${1}" = "--" ]
-	    then
-		shift
-		break
-	    fi
+	    [ "${1}" = "--" ] &&
+		shift && break
 	    ops="${ops} ${1} "
 	    shift
 	done
 
 	### Remove uneccesary dependencies
-	[ ${exit_status} -eq 0 ] &&
-	    /usr/bin/emerge --quiet --depclean ${ops}		# depclean ops
-	res=${?}
-	#echo "	Exit status: $res"
+	[ ${st_last} -eq 0 ] &&
+	    ${_emerge} --quiet --depclean ${ops}
+	comb_st
+	info "	depclean exit status: ${st_last}"
 
 	# Catch errors and decide action
-	[ ${res} -ne 130 ] && [ ${res} -ne 102 ] || exit ${res}
-	#[ $res -eq 0 ] || exit $res
-	exit_status=$(( ${exit_status} + ${res} ))
+	[ ${st_last} -ne 130 ] && [ ${st_last} -ne 102 ] || exit ${st_total}
 
 	### Rebuild packages with broken link level dependencies
-	/usr/bin/revdep-rebuild ${@}		# rest of them for rebuild
-	res=${?}
-	#echo "	Exit status: $res"
+	${_revdep} ${@}		# rest of them for rebuild
+	comb_st
+	info "	revdep-rebuild exit status: ${st_last}"
 
 	# Catch errors and decide action
-	[ ${res} -ne 130 ] && [ ${res} -ne 102 ] || exit ${res}
-	#[ $res -eq 0 ] || exit $res
-	exit_status=$(( ${exit_status} + ${res} ))
+	[ ${st_last} -ne 130 ] && [ ${st_last} -ne 102 ] || exit ${st_last}
 
 	# can't be bothered to try and parse ops for these as well
 
@@ -89,31 +94,30 @@ case "${0##*/}" in
 	do
 	    case "${x}" in
 		"python")
-		    /usr/bin/eselect python update --python2
-		    /usr/bin/eselect python update --python3
-		    /usr/sbin/python-updater
-		    res=${?}
+		    command eselect python update --python2
+		    command eselect python update --python3
+		    command python-updater
 		    ;;
 		"perl")
-		    /usr/sbin/perl-cleaner
-		    res=${?}
+		    command perl-cleaner
 		    ;;
 		"xorg-server")
-		    /usr/bin/emerge -1 "$(qlist -qCU xorg-drivers | sed -e \
+		    command emerge -1 "$(qlist -qCU xorg-drivers | sed -e \
 			's:\([^ _]*\)_[^ _]*_\([^ _]*\):x11-drivers/xf86-\1-\2:g')"
-		    res=${?}
 		    ;;
 	    esac
+	    comb_st
 	    # Catch errors and decide action
-	    [ ${res} -ne 130 ] && [ ${res} -ne 102 ] || exit ${res}
-	    exit_status=$(( ${exit_status} + ${res} ))
+	    [ ${st_last} -ne 130 ] && [ ${st_last} -ne 102 ] || exit ${st_last}
 	done
 
 	### Clean uneeded tar.bz2's
-	/usr/bin/eclean-dist -d
+	command eclean -d distfiles
+	comb_st
 
 	### Update eix index
-	/usr/bin/eix-update --quiet
+	command eix-update --quiet
+	comb_st
 
 	;;
 
@@ -132,7 +136,7 @@ case "${0##*/}" in
 	#/usr/sbin/eupdatedb --quiet
 
 	eix-sync
-	exit_status=${?}
+	comb_st
 	;;
 
     *)
@@ -142,4 +146,4 @@ case "${0##*/}" in
 
 esac
 
-exit ${exit_status}
+exit

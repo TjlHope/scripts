@@ -1,26 +1,34 @@
 #!/bin/sh
-# SCRIPTS_DIR/lib/echo.sh
+# SCRIPTS_DIR/lib/output.sh
 # Functions to supplement just 'echo'ing messages.
-# Use 'negative test' OR 'echo' so only non-zero return value is an error.
 
-cleanup () {	# dummy function to be overwriten if required
-    :
-}
+${source_output-true} &&
+    source_output=false ||
+    return 0
 
-die () {
-    [ ${verbose-0} -lt -1 ] ||
-	echo "ERROR:" "${@}" >&2
-    cleanup
-    exit 1
-}
-
-warn () {
-    [ ${verbose-0} -lt 0 ] ||
-	echo "WARNING:" "${@}" >&2
+show () {	# for notify.sh compat
+    echo "MESSAGE:" "${@}"
 }
 
 info () {
-    [ ${verbose-0} -le 0 ] ||
-	echo "INFO:" "${@}"
+    ${verbose} || return 0
+    echo "INFO:" "${@}"
+}
+
+warn () {
+    ${verbose} || return 0
+    echo "WARNING:" "${@}" >&2
+}
+
+error () {
+    echo "ERROR:" "${@}" >&2
+}
+
+cleanup () { :;}	# dummy function to be overwriten if required
+
+die () {
+    error "${@}"
+    cleanup
+    exit 1
 }
 

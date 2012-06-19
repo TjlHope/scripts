@@ -2,6 +2,10 @@
 # SCRIPTS_DIR/lib/check_net.sh
 # Function that uses ping to test the internet connection.
 
+${source_check_net-true} &&
+    source_check_net=false ||
+    return 0
+
 _ping="$(command -v ping)" || {
     echo "Cannot find 'ping'" >&2
     kill -QUIT ${$}

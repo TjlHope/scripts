@@ -1,12 +1,15 @@
 #!/bin/sh
+# SCRIPTS_DIR/sbin/run_cron
+# Run the scripts contained in the /etc/cron.PERIOD directories.
 
 log="${LOG-/dev/null}"
 
 ## souce library scripts	{{{1
 [ -h "${0}" ] &&
-    script_path="$(readlink -f "${0}")" ||
-    script_path="${0}"
-. "${script_path%/*}/../lib/output.sh"
+    script_p="$(readlink -f "${0}")" ||
+    script_p="${0}"
+lib_d="${script_p%/*/*}/lib"
+. "${lib_d}/output.sh"
 
 ## Global Variables		{{{1
 prefix="/etc"
@@ -14,10 +17,10 @@ dir_prefix="cron"
 
 ## Process Name and Arguments	{{{1
 
-[ "${0##*.}" != "${0}" ]	&&
+[ "${0##*.}" != "${0}" ] &&
     period="${0##*.}"	# name of the form run_cron.period
 
-while [ -n "${1}" ]
+while [ ${#} -gt 0 ]
 do
     if [ -z "${1##-*}" ]
     then
@@ -33,10 +36,7 @@ do
 		shift
 		;;
 	    '-v'|'--verbose')
-		verbose=$(( ${verbose-0} + 1 ))
-		;;
-	    '-q'|'--quiet')
-		verbose=$(( ${verbose-0} - 1 ))
+		verbose=true
 		;;
 	    *)
 		warn "Invalid option '${1}'."
@@ -46,8 +46,8 @@ do
     else
 
 	# it's the period definition
-	[ -z "${period}" ]	&&
-	    period="${1}"	||
+	[ -z "${period}" ] &&
+	    period="${1}" ||
 	    die "Multiple period definitions: '${period}' and '${1}'."
 
     fi

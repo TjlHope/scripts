@@ -1,5 +1,5 @@
 #!/bin/sh
-# SCRIPTS_DIR/lib/wrappers/xfconf.sh
+# SCRIPTS_DIR/share/wrappers/xfconf.sh
 # Small script to access the xfconf utility, personally used from changing
 # compositing and theme.
 

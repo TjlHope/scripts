@@ -1,12 +1,13 @@
 #!/bin/sh
-# SCRIPTS_DIR/lib/wrappers/mount.sh
+# SCRIPTS_DIR/share/wrappers/mount.sh
 
 # source library scripts 
 [ -h "${0}" ] &&
-    script_path="$(readlink -f "${0}")" ||
-    script_path="${0}"
-. "${script_path%/*}/../../lib/prog.sh"
-. "${script_path%/*}/../../lib/status.sh"
+    script_p="$(readlink -f "${0}")" ||
+    script_p="${0}"
+lib_d="${script_p%/*/*/*}/lib"
+. "${lib_d}/prog.sh"
+. "${lib_d}/status.sh"
 
 case "${0##*/}" in
 

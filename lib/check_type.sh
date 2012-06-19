@@ -1,6 +1,11 @@
 #!/bin/sh
 # SCRIPTS_DIR/lib/check_type.sh
 # Functions to check the type of data.
+
+${source_check_type-true} &&
+    source_check_type=false ||
+    return 0
+
 # TODO: add more :)
 
 check_int () {

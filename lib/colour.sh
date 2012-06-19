@@ -2,6 +2,10 @@
 # SCRIPTS_DIR/lib/colour.sh
 # Variables for ANSI colour escape sequences
 
+${source_colour-true} &&
+    source_colour=false ||
+    return 0
+
 # Control codes
 _eb='['	# begin
 _es=';'		# seperator
@@ -40,7 +44,7 @@ _colour_code () {	# colour
     [ "${1}" = "black" ] &&	# 'black' conflicts with 'blue'
 	colour="k" ||		# ... so 'k' (key) is used
 	colour="${1%${1#?}}"	# strip (arg without first char) from the end.
-    eval 'code="${_c'"${colour}"'}"'	# evaluate to colour code
+    eval "code=\"\${_c${colour}}\""	# evaluate to colour code
     [ -z "${code}" ] &&		# if no code
 	return 1		# ... return false
     echo "${code}"		# output code
@@ -53,7 +57,7 @@ _attr_code () {		# attribute
     [ "${1}" = "blink" ] &&	# 'blink' conflicts with 'bold'/'bright'
 	attr="a" ||		# ... so 'a' (annoy) is used
 	attr="${1%${1#?}}"	# strip (arg without first char) from the end.
-    eval 'code="${_a'"${attr}"'}"'	# evaluate to colour code
+    eval "code=\"\${_a${attr}}\""	# evaluate to attribute code
     [ -z "${code}" ] &&		# if no code
 	return 1		# ... return false
     echo "${code}"		# output code
@@ -62,12 +66,12 @@ _attr_code () {		# attribute
 _refresh_fmt () {	# [prefix]
     local codes code
     eval "${1}fmt='${_eb}'"	# reset $fmt string
-    eval 'codes="'"\${${1}_fgclr} \${${1}_bgclr} \${${1}_attr}"'"'
+    eval "codes=\"\${${1}_fgclr} \${${1}_bgclr} \${${1}_attr}\""
     for code in ${codes}
     do
-	eval "${1}fmt="'"${'"${1}fmt}${code}${_es}"'"'	# add code to string
+	eval "${1}fmt=\"\${${1}fmt}${code}${_es}\""	# add code to string
     done
-    eval "${1}fmt="'"${'"${1}fmt%${_es}}${_ee}"'"'	# terminate string
+    eval "${1}fmt=\"\${${1}fmt%${_es}}${_ee}\""		# terminate string
 }
 
 # Setting functions

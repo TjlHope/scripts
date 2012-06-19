@@ -2,6 +2,10 @@
 # SCRIPTS_DIR/lib/percent_blocks.sh
 # Functions to display percentages using unicode block characters.
 
+${source_percent_blocks-true} &&
+    source_percent_blocks=false ||
+    return 0
+
 _bf00=" "	# u0020 space
 _bu12="▀"	# u2580 upper half block
 _bd18="▁"	# u2581 lower one eighth block

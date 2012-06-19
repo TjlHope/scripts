@@ -10,10 +10,11 @@ log="${LOG-/dev/stdout}"	# allow overiding with envvar LOG
 
 # source library scripts for program location and expression matching
 [ -h "${0}" ] &&
-    script_path="$(readlink -f "${0}")" ||
-    script_path="${0}"
-. "${script_path%/*}/../lib/prog.sh"
-. "${script_path%/*}/../lib/expr.sh"
+    script_p="$(readlink -f "${0}")" ||
+    script_p="${0}"
+lib_d="${script_p%/*/*}/lib"
+. "${lib_d}/prog.sh"
+. "${lib_d}/expr.sh"
 
 # commands need to be run as specific users
 priv_cmd="sudo -bnu \${user}"	# also background them; fail rather than prompt

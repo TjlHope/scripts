@@ -1,5 +1,5 @@
 #!/bin/sh
-# SCRIPTS_DIR/lib/wrappers/bizip2.sh
+# SCRIPTS_DIR/share/wrappers/bizip2.sh
 # FIXME: unfinished
 
 # defaults
@@ -8,7 +8,7 @@ bytes=1073741824
 force=0
 
 size2bytes () {
-    sz="$(echo ${1} | /bin/sed -ne \
+    sz="$(echo ${1} | sed -ne \
 	    's:\([0-9]\+\)\([cwbKMGTPEZY]\?\)\([Bi]\?\):\1|\2|\3:p')"
     [ -n "${sz##*|}" ] &&
 	mul=1000 ||

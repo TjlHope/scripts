@@ -1,5 +1,5 @@
 #!/bin/sh
-# SCRIPTS_DIR/lib/wrappers/find.sh
+# SCRIPTS_DIR/share/wrappers/find.sh
 
 # Get Wrapper specific Opts:
 case "${0##*/}" in

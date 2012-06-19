@@ -2,18 +2,16 @@
 # SCRIPTS_DIR/bin/jitsi
 
 [ -h "${0}" ] &&
-    script_path="$(/bin/readlink -f "${0}")" ||
-    script_path="${0}"
-
-. "${script_path%/*}/../lib/send_message.sh"
+    script_p="$(readlink -f "${0}")" ||
+    script_p="${0}"
+lib_d="${script_p%/*/*}/lib"
+. "${lib_d}/notify.sh"
 
 [ -d ~/Downloads/jitsi ] && {
     cd ~/Downloads/jitsi
-    send_message "Jitsi" "Loading..."
+    show "Jitsi" "Loading..."
     ant run
-    send_message "Jitsi" "Finished"
-} || {
-    send_message -e "Jitsi" "Run Failed"
-    exit 1
-}
+    show "Jitsi" "Finished"
+} ||
+    die "Jitsi" "Run Failed"
 	

@@ -1,5 +1,5 @@
 #!/bin/sh
-# SCRIPTS_DIR/lib/wrappers/get_iplayer.sh
+# SCRIPTS_DIR/share/wrappers/get_iplayer.sh
 # Wrapper script for get_iplayer, allows easy recording of series (using pvr) 
 # and films, and easy watching of live tv.
 
@@ -7,14 +7,16 @@
 #	Want to enable pvr to run in parallel, standard lockfile prevents this.  
 #	Experiment with removing the lockfile, etc.
 
+log="${LOG-/dev/null}"
+
 ### set up variables
 [ -h "${0}" ] &&
-    script_path="$(readlink -f "${0}")" ||
-    script_path="${0}"
-. "${script_path%/*}/../../lib/check_net.sh"
+    script_p="$(readlink -f "${0}")" ||
+    script_p="${0}"
+lib_d="${script_p%/*/*/*}/lib"
+. "${lib_d}/check_net.sh"
 
 _iplayer="$(command -v "get_iplayer")"
-log="${LOG-/dev/null}"
 
 case "${0##*/}" in
 
@@ -67,15 +69,14 @@ case "${0##*/}" in
 
     "get_iplayer.films")
 
-	${_iplayer} --nosubdir --long --category=Film,Films \
+	exec ${_iplayer} --nosubdir --long --category=Film,Films \
 	    --modes=flashhd,flashvhigh "${@}"
 
 	;;
 
     "get_iplayer.live")
 
-	${_iplayer} --type=livetv,liveradio \
-	    --stream "${@}" --player="mplayer -cache 128 -" 
+	exec ${_iplayer} --type=livetv,liveradio "${@}"
 
 	;;
 

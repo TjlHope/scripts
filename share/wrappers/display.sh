@@ -1,5 +1,5 @@
 #!/bin/sh
-# SCRIPT_DIR/lib/wrappers/display.sh
+# SCRIPT_DIR/share/wrappers/display.sh
 # Small script to manipulate the display in several ways.
 
 prog="$(command -v xrandr)"

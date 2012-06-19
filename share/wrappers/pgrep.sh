@@ -1,5 +1,5 @@
 #!/bin/sh
-# SCRIPTS_DIR/lib/wrappers/pgrep.sh
+# SCRIPTS_DIR/share/wrappers/pgrep.sh
 
 prog="$(command -v pgrep)"
 

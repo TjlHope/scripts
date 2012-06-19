@@ -4,25 +4,24 @@
 
 # source library functions
 [ -h "${0}" ] &&
-    script_path="$(/bin/readlink -f "${0}")" ||
-    script_path="${0}"
-. "${script_path%/*}/../lib/percent_blocks.sh"
-. "${script_path%/*}/../lib/check_type.sh"
-. "${script_path%/*}/../lib/colour.sh"
+    script_p="$(readlink -f "${0}")" ||
+    script_p="${0}"
+lib_d="${script_p%/*/*}/lib"
+. "${lib_d}/percent_blocks.sh"
+. "${lib_d}/check_type.sh"
+. "${lib_d}/colour.sh"
+. "${lib_d}/output.sh"
 
-# Use $SHM_D (if defined) for starage, fallback of /tmp/$USER
+# Use $SHM_D (if defined) for storage, fallback of /tmp/$USER
 shm_d="${SHM_D:-/tmp/${USER}}"
 {
     [ -d "${shm_d}" ] || {
 	[ -w "${shm_d%/*}" ] &&
 	    mkdir "${smh_d}"
     }
-} && {
-    [ -w "${shm_d}" ]
-} || {
-    echo "Error: Cannot access shared memory directory: ${shm_d}." >&2
-    exit 1
-}
+} && 
+    [ -w "${shm_d}" ] ||
+    die "Cannot access shared memory directory: ${shm_d}."
 
 cpu_usage () {
     # Function to get current cpu usage, stores the current, and ${1:-inf} 
@@ -136,19 +135,15 @@ do
 	    [ "${1#${opt_patt}?}" = "${1}" ] &&
 		shift
 	    hist="${1#${opt_patt}}"
-	    check_int ${hist} || {
-		echo "-h requires an integer argument" >&2
-		exit 1
-	    }
+	    check_int ${hist} ||
+		die "-h requires an integer argument"
 	    ;;
 	-n*|--num*|--number*)
 	    [ "${1#${opt_patt}?}" = "${1}" ] &&
 		shift
 	    number="${1#${opt_patt}}"
-	    check_int ${number} || {
-		echo "-n requires an integer argument" >&2
-		exit 1
-	    }
+	    check_int ${number} ||
+		die "-n requires an integer argument"
 	    ;;
 	-v|--verb|--verbose)
 	    verbose=true
@@ -250,8 +245,7 @@ then
     then
 	pc_block="pc_hblock"
     else
-	echo "Error: '-h ${hist}' can only be used with '-n 1'" >&2
-	exit 1
+	die "'-h ${hist}' can only be used with '-n 1'"
     fi
 
     cpu="$(${pc_block} ${cpu} ${number})"

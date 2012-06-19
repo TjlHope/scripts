@@ -2,6 +2,9 @@
 # SCRIPTS_DIR/lib/prog.sh
 # Functions to ease the finding of the wanted program.
 
+${source_prog-true} &&
+    source_prog=false ||
+    return 0
 
 # Variable and function that uses `which` and `md5sum` to find the first
 # program of the same name as the calling script.

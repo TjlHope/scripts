@@ -4,9 +4,10 @@
 # and turning the backlight on and off.
 
 [ -h "${0}" ] &&
-    script_path="$(/bin/readlink -f "${0}")" ||
-    script_path="${0}"
-. "${script_path%/*}/../lib/send_message.sh"
+    script_p="$(readlink -f "${0}")" ||
+    script_p="${0}"
+lib_d="${script_p%/*/*}/lib"
+. "${lib_d}/notify.sh"
 icon="xfpm-brightness-lcd"
 icon_error="xfpm-brightness-lcd-invalid"
 notify_opts="--category=device "
@@ -67,7 +68,7 @@ bl_power="${backlight:-${backup}}/bl_power"
 	    echo "ACTIONS"
 	    echo "	up, +		Increase by 1"
 	    echo "	down, -		Decrease by 1"
-	    echo "	0-${max}	Set level"
+	    echo "	0-${max}		Set level"
 	    echo "	on		Turn backlight on"
 	    echo "	off		Turn backlight off"
 	    echo "	toggle		Toggle backlight on/off"
@@ -76,8 +77,8 @@ bl_power="${backlight:-${backup}}/bl_power"
 	    ;;
     esac
     echo "${current}" > "${bl_brightness}"
-    send_message "LCD Brightness:" "${current} / ${max}"
+    show "LCD Brightness:" "${current} / ${max}"
     echo "${power}" > "${bl_power}"
 } || {
-    send_message -e "LCD Brightness:" "Control Error"
+    error "LCD Brightness:" "Control Error"
 }
