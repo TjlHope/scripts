@@ -42,6 +42,15 @@ case "${x_cmd##*/}" in
 	;;
     *)	lock_x="${x_cmd}";;
 esac
+lock_x="${priv_cmd} $(first_cmd 'gnome-screensaver-command --lock' \
+				'xscreensaver-command -lock' \
+				'xlock' \
+				'alock' \
+				'slock')"
+unlock_x="${priv_cmd} $(first_cmd 'gnome-screensaver-command --deactivate' \
+				  'xscreensaver-command -deactivate' \
+				  'xlock -deactivate' \
+				  'true')"
 
 # command for DPMS control
 dpms_cmd="${priv_cmd} $(first_cmd 'xset')"
@@ -66,6 +75,8 @@ case "${vt_cmd##*/}" in
 	#TODO: 'away')		lock_vt="${vt_cmd} ??";;
 	'busybox')	lock_vt="${vt_cmd} vlock -an";;
 esac
+lock_vt="${priv_cmd} $(first_cmd 'vlock -an' 'lock -npv' \
+				 'away' 'busybox vlock -an')"
 
 # commands for locking Terminal Multiplexers	# FIXME: only tmux supported
 mux_cmd="${priv_cmd} $(first_cmd 'tmux' 'screen')"
@@ -164,7 +175,7 @@ done
 action="lock"
 def_devs="x dpms vt_mux"
 
-while [ -n "${1}" ]
+while [ ${#} -gt 0 ]
 do
     case "${1}" in
 	'-l'|'-lock'|'--lock'|'-activate'|'--activate')

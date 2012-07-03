@@ -37,11 +37,12 @@ get_prog () {
 first_cmd () {
     # Function to find the first valid program in the argument list, and return 
     # it's full path.
-    local cmd
-    while [ -n "${1}" ]
+    local name cmd
+    while [ ${#} -gt 0 ]
     do
-	cmd="$(command -v "${1}")" && {
-	    echo "${cmd}"
+	name="${1%%[${IFS}]*}"	# dash needs an intermediary variable
+	cmd="$(command -v ${name} 2>/dev/null)" && {
+	    echo "${cmd}${1#${name}}" 
 	    return 0
 	}
 	shift
