@@ -40,12 +40,12 @@ case "${0##*/}" in
 	done
 
 	### Update
-	ex_pkgs="cross-*/*"
+	excludes="--exclude=cross-*/*"
 	vcs_pkgs="$(command eix-installed -a 2>/dev/null \
 	    | sed -ne 's:^\(.*/.*\)-9999\(-r[0-9]\+\)\?$:\1:p')"
-	${_emerge} --ask --update --deep --newuse --with-bdeps=y --keep-going \
-	    ${ex_pkgs:+--exclude ${ex_pkgs}} ${opts} \
-	    ${pkgs:-@world ${vcs_pkgs}}
+	${_emerge} --ask --keep-going --update --newuse --deep --with-bdeps=y \
+	    ${excludes} ${opts} \
+	    ${pkgs:-@world --oneshot ${vcs_pkgs}}
 	comb_st
 	info "	Emerge exit status: ${st_last}"
 
