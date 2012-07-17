@@ -5,13 +5,22 @@
 # Only checked to work on Gentoo with a line in sudoers:
 #	%audio ALL = NOPASSWD: /etc/init.d/mpd
 
-/etc/init.d/mpd --quiet status ||
-    command sudo -n /etc/init.d/mpd --quiet start
-
 [ -h "${0}" ] &&
     script_p="$(readlink -f "${0}")" ||
     script_p="${0}"
 lib_d="${script_p%/*/*/*}/lib"
+. "${lib_d}/output.sh"
+
+mpd_service="${MPD_SERVICE-/etc/init.d/mpd --quiet}"
+
+## Check, start, and assert MPD service
+${mpd_service} status ||
+    command sudo -n ${mpd_service} start
+${mpd_service} status ||
+    die "MPD service isn't started."
+
+## run client with arguments
+
 . "${lib_d}/prog.sh"
 
 exec $(get_prog $(command which -a "${0##*/}")) "${@}"
