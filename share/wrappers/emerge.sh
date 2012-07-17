@@ -9,12 +9,17 @@
 lib_d="${script_p%/*/*/*}/lib"
 . "${lib_d}/status.sh"
 . "${lib_d}/output.sh"
+. "${lib_d}/prog.sh"
 
-_emerge="$(command -v emerge)"
+_emerge="$(first_cmd emerge)"
 
 case "${0##*/}" in
 
     "emerge.update")
+
+	_revdep="$(first_cmd revdep-rebuild)"
+	_clean="$(first_cmd "eclean -d distfiles")"
+	_update="$(first_cmd eix-update eupdatedb)"
 
 	# fetch first ops
 	opts=""
@@ -43,7 +48,7 @@ case "${0##*/}" in
 	excludes="--exclude=cross-*/*"
 	vcs_pkgs="$(command eix-installed -a 2>/dev/null \
 	    | sed -ne 's:^\(.*/.*\)-9999\(-r[0-9]\+\)\?$:\1:p')"
-	${_emerge} --ask --keep-going --update --newuse --deep --with-bdeps=y \
+	${_emerge} --ask --keep-going --update --newuse --deep \
 	    ${excludes} ${opts} \
 	    ${pkgs:-@world --oneshot ${vcs_pkgs}}
 	comb_st
@@ -112,36 +117,42 @@ case "${0##*/}" in
 	done
 
 	### Clean uneeded tar.bz2's
-	command eclean -d distfiles
+	${_clean}
 	comb_st
 
 	### Update eix index
-	command eix-update --quiet
+	${_update} -q
 	comb_st
 
 	;;
 
     "emerge.sync")
-	#echo "Sync Portage..."
-	#/usr/bin/emerge --sync --quiet
-	#exit_status=$(( $exit_status + $res ))
-	#echo "	Exit status: $res"
 
-	#echo "Sync Layman..."
-	#/usr/bin/layman --sync-all --quiet
-	#exit_status=$(( $exit_status + $res ))
-	##echo "	Exit status: $res"
+	_update="$(first_cmd eix-sync eupdatedb)"
+	_layman="$(first_cmd layman)"
+
+	if [ -n "${_update##*sync*}" ]
+	then
+
+	    #echo "Sync Portage..."
+	    ${_emerge} -q --sync
+	    comb_st
+
+	    #echo "Sync Layman..."
+	    ${_layman} -q --sync-all
+	    comb_st
+
+	fi
 
 	#echo "Update db"
-	#/usr/sbin/eupdatedb --quiet
-
-	eix-sync
+	${_update} -q
 	comb_st
+
 	;;
 
     *)
 	echo "Invalid command: ${0}" >&2
-	exit 1
+	false
 	;;
 
 esac
