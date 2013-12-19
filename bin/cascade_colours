@@ -1,0 +1,62 @@
+#!/bin/sh
+
+cascade_colours()
+{
+    local i=1 j=0 k=0 a b c delta width=${COLUMNS:=80} margin=0 number
+    case "$1" in
+        1)      delta=${2-$(( $COLUMNS / 16 ))};;
+        2)      width=${2-$(( $COLUMNS / 4 ))}
+                delta=${3-$(( $COLUMNS / 24 ))};;
+        #*)     defaults
+    esac
+    trap 'trap - USR1; return' USR1
+    while true
+    do
+        a=$(( ${RANDOM-$(od -vAn -N2 -t u2 < /dev/urandom)} % 3 ))
+        b=$(( ${RANDOM-$(od -vAn -N2 -t u2 < /dev/urandom)} % 2 ))
+        c=$(( ${RANDOM-$(od -vAn -N2 -t u2 < /dev/urandom)} % 3 ))
+        case $a in
+            0)
+                case $b in
+                    0)  [ $i -gt 1 ] && i=$(( $i - 1 ));;
+                    1)  [ $i -lt 6 ] && i=$(( $i + 1 ));;
+                esac;;
+            1)
+                case $b in
+                    0)  [ $j -gt 0 ] && j=$(( $j - 1 ));;
+                    1)  [ $j -lt 5 ] && j=$(( $j + 1 ));;
+                esac;;
+            2)
+                case $b in
+                    0)  [ $k -gt 0 ] && k=$(( $k - 1 ));;
+                    1)  [ $k -lt 5 ] && k=$(( $k + 1 ));;
+                esac;;
+        esac
+        case $1 in
+            1)
+                case $c in
+                    0)  [ $width -lt $(( $COLUMNS - 2 * $delta )) ] &&
+                            width=$(( $width + 2 * $delta ));;
+                    1)  [ $width -gt $(( 1 + 2 * $delta )) ] &&
+                            width=$(( $width - 2 * $delta ));;
+                esac
+                margin=$(( ($COLUMNS - $width) / 2 ));;
+            2)
+                case $c in
+                    0)  [ $margin -le $(( $COLUMNS - $width - $delta )) ] &&
+                            margin=$(( $margin + $delta ));;
+                    1)  [ $margin -ge $delta ] &&
+                            margin=$(( $margin - $delta ));;
+                esac;;
+        esac
+        number=$(( 15 + $i + 6*$j + 36*$k ))
+
+        [ $margin -gt 0 ] && printf "\033[0;49m%${margin}s" ' '
+        printf "\033[0;48;5;${number}m%${width}s\033[0;49m\n" ' '
+
+        sleep ${TIMEOUT:-0} 2>/dev/null
+    done
+}
+
+[ "$(basename "$(readlink -f "$0")" .sh)" != "cascade_colours" ] ||
+    cascade_colours "$@"

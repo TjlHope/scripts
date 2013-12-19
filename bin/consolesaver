@@ -1,0 +1,17 @@
+#!/bin/sh
+
+case "$1" in
+    -l)
+        for cmd in vlock "lock -np" away "busybox vlock"
+        do
+            prog=${cmd%%[$IFS]*}
+            LOCK="$(command -v $prog)${cmd#$prog}" && break
+        done
+        shift;;
+esac
+
+: ${TIMEOUT:=0.025} ${COLUMNS:=$(tput cols)}
+export TIMEOUT COLUMNS
+
+trap "trap - 0 INT; ${LOCK:-:}" 0 INT
+cascade_colours "$@"
