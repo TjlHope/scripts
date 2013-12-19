@@ -1,0 +1,13 @@
+#!/bin/sh
+
+script="$(readlink -f "$0")"
+path="${script%/*}"
+
+mail_dir="/var/mail/$USER/inbox"
+last="$(ls "$mail_dir" 2>/dev/null | sort -n | tail -n 1)"
+last_no="${last%%[!1-9]*}"
+next=$(( ${last_no:-0} + 1 ))
+
+"$path/msgconvert.pl" "$1" &&
+    mv "${1##*/}.mime" "$mail_dir/$next"
+    exec xdg-email
