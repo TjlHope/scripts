@@ -1,0 +1,76 @@
+#!/usr/bin/env python
+# SCRIPTS_D/bin/auto_passwd
+"""
+A script using pexpect to automate password re-entry.
+It can be called as '%(NM)s <EXECUTABLE_NAME>',
+or (via symlink) as '%(PRE)s<EXECUTABLE_NAME>'.
+"""
+
+from __future__ import division
+
+import sys as _sys
+import os as _os
+import optparse as _op
+import logging as _log
+
+import pexpect as px
+
+try:
+    from collections import OrderedDict
+except ImportError:
+    from collections_ import OrderedDict
+
+
+NAME = "auto_passwd"
+PREFIX = "ap_"
+PROG = _sys.argv[0].rsplit('/')[-1]
+
+# regex definitions:
+#PasswdREs = namedtuple('PasswdREs', 'ssh, su, sudo, prompt, fail')
+
+PASSWD_RES = OrderedDict(ssh="([^@]+)@\S+\s+[Pp]assword\s*:",
+                         su="[Pp]assword\s*:",
+                         sudo="[Pp]assword\s+[Ff]or\s+([^:]+)\s*:",
+                         prompt="[\$#]",
+                         fail="[Ff]ailed"
+                        )
+
+def parse():
+    # warn if not being executed properly
+    if not (PROG == NAME or PROG.startswith(PREFIX)):
+        log.warn("'%s' is not being invoked as '%s'," % (PROG, NAME))
+        log.warn("  or with the prefix '%s'; assuming the first" % PREFIX)
+        log.warn("  non-option argument is executable")
+    # generate parser...
+    parser = _op.OptionParser(description=__doc__.format(NM=NAME, PRE=PREFIX))
+    parser.add_option('-f', '--file',
+            help="Execute each line in FILE as a fresh set of arguments.")
+    opts, args = parser.parse_args()    # ... and parse
+    # extract executable from Calling Name?
+    cmd = PROG.startswith(PREFIX) and PROG[len(PREFIX):] + ' ' or ''
+    # generate command strings
+    cmds = ((cmd and not opts.file) or args) and [cmd + ' '.join(args)] or []
+    try:
+        fl = open(opts.file)
+        for line in fl:
+            cmds.append(cmd + line)
+        fl.close()
+    except TypeError, e:
+        log.debug(str(e))
+    except IOError, e:
+        log.error(str(e))
+        try:
+            fl.close()
+        except UnboundLocalError:
+            pass
+    return cmds
+
+def ex_passwd(prog):
+    prog.expect(PASSWD_RES.values())
+
+if __name__ == '__main__':
+    _log.basicConfig(level=_log.INFO)
+    log = _log.getLogger(name=PROG)
+    cmds = parse() or _sys.exit(1)
+    for cmd in cmds:
+        print(cmd)
