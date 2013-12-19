@@ -1,0 +1,71 @@
+#!/bin/sh -e
+# git-hg-diff
+#       replaces the hashes in the given (or generated) git diff with their
+#       mercurial counterparts.
+
+[ "$(git notes get-ref)" = "refs/notes/hg" ] || {
+    echo "Error: The notes reference isn't 'refs/notes/hg'," >&2
+    echo "       so the mercuiral hashes cannot be retrieved." >&2
+    exit 1
+}
+
+split() {       # returns by updating vars 'first' and 'rest'
+    local str="$1" chr="${2-$IFS}" def_first="$3" def_rest="${4-$3}"
+    first="${str%%[$chr]*}" rest="${str#*$chr}"
+    [ "$rest" = "$str" ] && rest=""
+    : ${first:=$def_first} ${rest:=$def_rest}
+}
+
+# Process arguments in a function so we can play around with shift
+# and set -- as much as we like
+process_git_diff_args() {
+    local first rest            # split return vars
+    unset stdin from to         # we set these as return values
+    while [ $# -gt 0 ]
+    do
+        case "$1" in
+            -?*|--?*)   :;;                     # argument, so ignore it
+            --)         break;;                 # only files left, we're done
+            -)          stdin=true;;            # the diff's being piped in
+            # do *...* first as *..* would match it as well
+            *...*)      split "$1" ... HEAD     # base commit range
+                from="$(git merge-base "$first" "$rest")" to="$rest"
+                break;;                         # got from and to, we're done
+            *..*)       split "$1" .. HEAD      # commit range
+                from="$first" to="$rest"
+                break;;                         # got from and to, we're done
+            *)                                  # single commit
+                if [ -z "$from" ]; then from="$1"
+                elif [ -z "$to" ]; then to="$1"
+                else break                      # got from and to, we're done
+                fi;;
+        esac
+        shift
+    done
+    # return, setting defaults as necessary
+    : ${stdin=false} ${from=HEAD} ${to=}
+}
+process_git_diff_args "$@"
+
+hg_from="$(git notes show "$from" 2>/dev/null || :)"
+[ -n "$to" ] && hg_to="$(git notes show "$to" 2>/dev/null || :)"
+
+[ -z "$hg_from" ] && {
+    echo "Cannot determine mercurial hash for $from, enter manually:" >&2
+    read hg_from
+}
+[ -n "$to" -a -z "$hg_to" ] && {
+    echo "Cannot determine mercurial hash for $to, enter manually:" >&2
+    read hg_to
+}
+
+{ $stdin &&
+    cat ||
+    git diff --full-index "$@"
+} | sed -e "
+    \:^diff --git a/\(.*\) b/\1$: {
+        s:^diff --git a/\(.*\) b/\1$:diff -r $hg_from ${hg_to:+-r $hg_to }\1:
+    }
+    \:^index .*$: {
+        d
+    }"
