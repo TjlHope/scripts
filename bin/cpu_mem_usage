@@ -76,46 +76,51 @@ mem_usage () {
     # Function to get current memory usage, stores the current, and ${1:-inf} 
     # previous values in ${SHM_D}/mem; and outputs the current, and ${1:-0} 
     # from the file each call.
+    # If a -u flag is given, rather than using the active memory, the used
+    # (non-free/active & inactive) memory is used.
     ## Variables
-    local mem a t p _a _t _p fl="${shm_d}/mem"
+    local mem u t p _u _t _p fl="${shm_d}/mem" used="Active"
+    { [ "$1" = -u ] && shift || [ "$2" = -u ]; } && used="MemFree"
     # check the previous values (defaults if necessary)
     [ -f "${fl}" ] &&
-	read a t p < "${fl}" ||
+	read u t p < "${fl}" ||
 	echo "0 0 0" > "${fl}"
     ## Calculate current
-    # get the total and active mem values from /proc/meminfo: ACTIVE|TOTAL
+    # get the total and free mem values from /proc/meminfo: FREE|TOTAL
     mem="$(sed -n /proc/meminfo -e \
-	':new
+	":new
 	N
-	s/.*MemTotal:\s\+\([0-9]\+\)\+\s\+.*\nActive:\s\+\([0-9]\+\)\s\+.*$/\2|\1/p
-	T new')"
-    a="$(( ${mem%|*} / 1024 ))"		# Active memory (MB)
-    t="$(( ${mem#*|} / 1024 ))"		# Active memory (MB)
-    p=$(( (1000 * ${a} / ${t} + 5) / 10 ))	# percent used
+	s/.*MemTotal:\s\+\([0-9]\+\)\+\s\+.*\n$used:\s\+\([0-9]\+\)\s\+.*$/\2|\1/p
+	T new")"
+    t="$(( ${mem#*|} / 1024 ))"			# Total memory (MB)
+    [ "$used" = "Active" ] &&
+	u="$(( ${mem%|*} / 1024 ))" ||		# Active memory (MB)
+	u="$(( ${t} - ( ${mem%|*} / 1024 ) ))"	# Non-Free memory (MB)
+    p=$(( (1000 * ${u} / ${t} + 5) / 10 ))	# percent used
     ## Insert new value into file and rotate if necessary
     sed -i "${fl}" -n -e "\
 	1 {
 	    h
-	    s:^.*$:${a} ${t} ${p}:p
+	    s:^.*$:${u} ${t} ${p}:p
 	    g
 	}
 	1,${1:-$} p
 	"
     ## Output values
-    a=""; t=""; p=""	# reset values for file read
-    while read _a _t _p			# for each line in file
+    u=""; t=""; p=""	# reset values for file read
+    while read _u _t _p			# for each line in file
     do
-	[ -n "${a}" -a -n "${t}" -a -n "${p}" ] && {
+	[ -n "${u}" -a -n "${t}" -a -n "${p}" ] && {
 	    # output the percentage
 	    ${verbose-false} &&
-		echo "mem: ${a} / ${t} = ${p}" >&2
+		echo "mem: ${u} / ${t} = ${p}" >&2
 		echo "${p}"
 	    # only output ${1:-1} values
 	    [ -n "${1}" ] ||
 		break
 	}
 	# next set of values
-	a="${_a}"; t="${_t}"; p="${_p}"
+	u="${_u}"; t="${_t}"; p="${_p}"
     done < "${fl}"
 }
 
@@ -148,6 +153,9 @@ do
 	-v|--verb|--verbose)
 	    verbose=true
 	    ;;
+        -u|--used|--used-mem)
+            used=-u
+            ;;
 	-s*|--sep*|--seperator*)
 	    [ "${1#${opt_patt}?}" = "${1}" ] &&
 		shift
@@ -220,6 +228,8 @@ do
 	    echo "		show N historical values as well"
 	    echo "	-n N, --number=N"
 	    echo "		(-b only) display using blocks of width N"
+	    echo "	-u, --used, --used-mem"
+            echo "		show used (non-free) memory, not just active"
 	    echo "	-v, --verbose"
 	    echo "		more verbose display"
 	    echo "	-s STR, --seperator=STR"
@@ -233,7 +243,7 @@ do
 done
 
 cpu="$(cpu_usage ${hist})"
-mem="$(mem_usage ${hist})"
+mem="$(mem_usage ${used} ${hist})"
 
 if ${blocks-false}
 then
