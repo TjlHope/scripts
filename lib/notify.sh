@@ -9,6 +9,8 @@ ${source_notify-true} &&
 
 # TODO: use ck-list-sessions as well, merge with output.sh
 
+# needs verbose to be set
+: ${verbose:=false}
 
 _notify="$(command -v notify-send)"
 show () {

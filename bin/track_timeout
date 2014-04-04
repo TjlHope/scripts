@@ -1,0 +1,67 @@
+#!/bin/sh
+# SCRIPTS_DIR/bin/jitsi
+
+[ -h "${0}" ] &&
+    script_p="$(readlink -f "${0}")" ||
+    script_p="${0}"
+lib_d="${script_p%/*/*}/lib"
+. "${lib_d}/get_prog.sh"
+. "${lib_d}/notify.sh"
+
+screensaver_watch="$(first_cmd "xscreensaver-command -watch")" ||
+    die "Cannot find watch command"
+
+fmt_plural() {  # count unit
+    [ $1 -eq 1 ] && echo "$1 $2" || echo "$1 ${2}s"
+}
+fmt_list() {    # [item1 [item2[ ...itemN]]]
+    local str="$1"
+    while [ $# -gt 1 ]
+    do  shift
+        case $# in
+            0)  break;;
+            1)  str="$str and $1";;
+            *)  str="$str, $1";;
+        esac
+    done
+    echo "$str"
+}
+
+
+unix_time() {   # date string
+    date "+%s" -d "$*"
+}
+hms_time() {    # seconds
+    [ $1 -gt 0 ] || {
+        echo "0 seconds"
+        return
+    }
+    local h=$(( $1 / 3600 )) m=$(( $1 / 60 % 60 )) s=$(( $1 % 60 ))
+    set --
+    [ $h -gt 0 ] && set -- "$@" "$(fmt_plural $h hour)"
+    [ $m -gt 0 ] && set -- "$@" "$(fmt_plural $m minute)"
+    [ $s -gt 0 ] && set -- "$@" "$(fmt_plural $s second)"
+    fmt_list "$@"
+}
+def_time() {    # date string
+    $verbose && date "+%c" -d "$*" || date "+%x %X" -d "$*"
+}
+
+$screensaver_watch | while read action time
+do
+    case "$action" in
+        BLANK|LOCK)
+            blanked=$(unix_time "$time");;
+        UNBLANK)
+            [ -n "$blanked" ] && {
+                unblanked=$(unix_time "$time")
+                duration=$(( $unblanked - $blanked ))
+                show "Blanked for $(hms_time $duration)" \
+                    "$(def_time @$blanked) -> $(def_time @$unblanked)"
+                unset blanked unblanked duration
+            };;
+        *)
+            info "Unknown Action:" "$action $time";;
+    esac
+done
+
