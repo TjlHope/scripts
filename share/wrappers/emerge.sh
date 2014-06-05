@@ -3,13 +3,13 @@
 # TODO: Clean up
 
 # source library scripts
-[ -h "${0}" ] &&
-    script_p="$(readlink -f "${0}")" ||
-    script_p="${0}"
+[ -h "$0" ] &&
+    script_p="$(readlink -f "$0")" ||
+    script_p="$0"
 lib_d="${script_p%/*/*/*}/lib"
-. "${lib_d}/status.sh"
-. "${lib_d}/output.sh"
-. "${lib_d}/prog.sh"
+. "$lib_d/status.sh"
+. "$lib_d/output.sh"
+. "$lib_d/prog.sh"
 
 _emerge="$(first_cmd emerge)"
 
@@ -22,23 +22,23 @@ case "${0##*/}" in
 	_update="$(first_cmd eix-update eupdatedb)"
 
 	# fetch first ops
-	opts=""
-	while [ ${#} -gt 0 ]
+	ops=""
+	while [ $# -gt 0 ]
 	do
-	    case "${1}" in
+	    case "$1" in
 		"--")
 		    shift
 		    break
 		    ;;
 		"-v"|"--verbose")
 		    verbose=true
-		    ops="${ops} ${1}"
+		    ops="$ops $1"
 		    ;;
 		"-"*)
-		    ops="${ops} ${1}"
+		    ops="$ops $1"
 		    ;;
 		*)
-		    pkgs="${pkgs} ${1}"
+		    pkgs="$pkgs $1"
 		    ;;
 	    esac
 	    shift
@@ -48,16 +48,16 @@ case "${0##*/}" in
 	excludes="--exclude=cross-*/*"
 	vcs_pkgs="$(command eix-installed -a 2>/dev/null \
 	    | sed -ne 's:^\(.*/.*\)-9999\(-r[0-9]\+\)\?$:\1:p')"
-	${_emerge} --ask --keep-going --update --newuse --deep \
-	    ${excludes} ${opts} \
-	    ${pkgs:-@world --oneshot ${vcs_pkgs}}
+	"$_emerge" --ask --keep-going --update --newuse --deep --with-bdeps=y \
+	    $excludes $ops \
+	    ${pkgs:-@world --oneshot $vcs_pkgs}
 	comb_st
-	info "	Emerge exit status: ${st_last}"
+	info "	Emerge exit status: $st_last"
 
 	# Catch errors and decide action
-	echo "${ops}" | sed -ne "/\(\<-[^-]\?\S*p\|\<--pretend\>\)/q1" &&
-	    [ ${st_last} -ne 130 ] && [ ${st_last} -ne 102 ] ||
-	    exit ${st_total}
+	echo "$ops" | sed -ne "/\(\<-[^-]\?\S*p\|\<--pretend\>\)/q1" &&
+	    [ $st_last -ne 130 ] && [ $st_last -ne 102 ] ||
+	    exit $st_total
 
 	# find necesary module updates
 	update_mods="$(tac /var/log/emerge.log | sed -ne \
@@ -67,37 +67,37 @@ case "${0##*/}" in
 
 	# fetch second ops
 	ops=""
-	while [ ${#} -gt 0 ]
+	while [ $# -gt 0 ]
 	do
-	    [ "${1}" = "--" ] &&
+	    [ "$1" = "--" ] &&
 		shift && break
-	    ops="${ops} ${1} "
+	    ops="$ops $1 "
 	    shift
 	done
 
 	### Remove uneccesary dependencies
-	[ ${st_last} -eq 0 ] &&
-	    ${_emerge} --quiet --depclean ${ops}
+	[ $st_last -eq 0 ] &&
+	    "$_emerge" --quiet --depclean $ops
 	comb_st
-	info "	depclean exit status: ${st_last}"
+	info "	depclean exit status: $st_last"
 
 	# Catch errors and decide action
-	[ ${st_last} -ne 130 ] && [ ${st_last} -ne 102 ] || exit ${st_total}
+	[ $st_last -ne 130 ] && [ $st_last -ne 102 ] || exit $st_total
 
 	### Rebuild packages with broken link level dependencies
-	${_revdep} ${@}		# rest of them for rebuild
+	$_revdep "$@"		# rest of them for rebuild
 	comb_st
-	info "	revdep-rebuild exit status: ${st_last}"
+	info "	revdep-rebuild exit status: $st_last"
 
 	# Catch errors and decide action
-	[ ${st_last} -ne 130 ] && [ ${st_last} -ne 102 ] || exit ${st_last}
+	[ $st_last -ne 130 ] && [ $st_last -ne 102 ] || exit $st_last
 
 	# can't be bothered to try and parse ops for these as well
 
 	### Perform needed module updates
-	for x in "${update_mods}"
+	for x in "$update_mods"
 	do
-	    case "${x}" in
+	    case "$x" in
 		"python")
 		    command eselect python update --python2
 		    command eselect python update --python3
@@ -113,15 +113,15 @@ case "${0##*/}" in
 	    esac
 	    comb_st
 	    # Catch errors and decide action
-	    [ ${st_last} -ne 130 ] && [ ${st_last} -ne 102 ] || exit ${st_last}
+	    [ $st_last -ne 130 ] && [ $st_last -ne 102 ] || exit $st_last
 	done
 
 	### Clean uneeded tar.bz2's
-	${_clean}
+	$_clean
 	comb_st
 
 	### Update eix index
-	${_update} -q
+	$_update -q
 	comb_st
 
 	;;
@@ -135,23 +135,23 @@ case "${0##*/}" in
 	then
 
 	    #echo "Sync Portage..."
-	    ${_emerge} -q --sync
+	    $_emerge -q --sync
 	    comb_st
 
 	    #echo "Sync Layman..."
-	    ${_layman} -q --sync-all
+	    $_layman -q --sync-all
 	    comb_st
 
 	fi
 
 	#echo "Update db"
-	${_update} -q
+	$_update -q
 	comb_st
 
 	;;
 
     *)
-	echo "Invalid command: ${0}" >&2
+	echo "Invalid command: $0" >&2
 	false
 	;;
 

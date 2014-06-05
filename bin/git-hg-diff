@@ -47,25 +47,28 @@ process_git_diff_args() {
 }
 process_git_diff_args "$@"
 
-hg_from="$(git notes show "$from" 2>/dev/null || :)"
-[ -n "$to" ] && hg_to="$(git notes show "$to" 2>/dev/null || :)"
+hash_msg="Cannot determine mercurial hash for %s,"
+hash_msg="$hash_msg\\nenter manually [blank for branch tip]: "
+get_hg_rev() { # <git_hash>
+    local git_hash="$1" hg_hash
+    hg_hash="$(git notes show "$git_hash" 2>/dev/null || :)"
+    [ -z "$hg_hash" ] && {
+        printf "$hash_msg" "$git_hash" >&2
+        read hg_hash
+    }
+    [ -n "$hg_hash" ] && echo "$hg_hash" || :   # so it works with set -e
+}
 
-[ -z "$hg_from" ] && {
-    echo "Cannot determine mercurial hash for $from, enter manually:" >&2
-    read hg_from
-}
-[ -n "$to" -a -z "$hg_to" ] && {
-    echo "Cannot determine mercurial hash for $to, enter manually:" >&2
-    read hg_to
-}
+hg_from="$(get_hg_rev "$from")"
+[ -n "$to" ] && hg_to="$(get_hg_rev "$to")"
 
 { $stdin &&
     cat ||
     git diff --full-index "$@"
 } | sed -e "
     \:^diff --git a/\(.*\) b/\1$: {
-        s:^diff --git a/\(.*\) b/\1$:diff -r $hg_from ${hg_to:+-r $hg_to }\1:
+        s:^diff --git a/\(.*\) b/\1$:diff -r $hg_from $hg_to\1:
     }
-    \:^index .*$: {
+    \:^\(index\|new file\) .*$: {
         d
     }"

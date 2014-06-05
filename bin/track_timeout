@@ -1,5 +1,8 @@
 #!/bin/sh
-# SCRIPTS_DIR/bin/jitsi
+# SCRIPTS_DIR/bin/track_timeout
+
+# if DISPLAY is not set, then it's definitely not going to work
+[ -n "$DISPLAY" ] || exit 1
 
 [ -h "${0}" ] &&
     script_p="$(readlink -f "${0}")" ||
@@ -10,6 +13,18 @@ lib_d="${script_p%/*/*}/lib"
 
 screensaver_watch="$(first_cmd "xscreensaver-command -watch")" ||
     die "Cannot find watch command"
+get_timeout() {
+    local rcfile="$HOME/.xscreensaver"  # TODO generic
+    while read option value rest;
+    do
+        case "$option" in
+            timeout:)   # TODO generic
+                echo "$value"
+                return;;
+        esac
+    done <"$rcfile"
+    return 1
+}
 
 fmt_plural() {  # count unit
     [ $1 -eq 1 ] && echo "$1 $2" || echo "$1 ${2}s"
@@ -31,6 +46,13 @@ fmt_list() {    # [item1 [item2[ ...itemN]]]
 unix_time() {   # date string
     date "+%s" -d "$*"
 }
+secs_time() {   # hh:mm:ss string
+    local h m s IFS="$IFS:"
+    read h m s <<- _EOF
+	$1
+	_EOF
+    echo $(( $h * 3600 + $m * 60 + $s ))
+}
 hms_time() {    # seconds
     [ $1 -gt 0 ] || {
         echo "0 seconds"
@@ -47,21 +69,33 @@ def_time() {    # date string
     $verbose && date "+%c" -d "$*" || date "+%x %X" -d "$*"
 }
 
-$screensaver_watch | while read action time
+while :
 do
-    case "$action" in
-        BLANK|LOCK)
-            blanked=$(unix_time "$time");;
-        UNBLANK)
-            [ -n "$blanked" ] && {
-                unblanked=$(unix_time "$time")
-                duration=$(( $unblanked - $blanked ))
-                show "Blanked for $(hms_time $duration)" \
-                    "$(def_time @$blanked) -> $(def_time @$unblanked)"
-                unset blanked unblanked duration
-            };;
-        *)
-            info "Unknown Action:" "$action $time";;
-    esac
+    $screensaver_watch | while read action time
+    do
+        case "$action" in
+            BLANK|LOCK)
+                blanked=$(unix_time "$time")
+                timeout=$(secs_time "$(get_timeout)")
+                idle=$(( $blanked - $timeout ))
+                [ $idle -lt ${woken-0} ] && idle=$woken # in case it was forced
+                unset blanked timeout;;
+            UNBLANK)
+                woken=$(unix_time "$time")
+                [ -n "$idle" ] && {
+                    duration=$(( $woken - $idle ))
+                    show "Idle for $(hms_time $duration)" \
+                        "$(def_time @$idle) -> $(def_time @$woken)"
+                    unset idle duration
+                };;
+            *)
+                info "Unknown Action:" "$action $time";;
+        esac
+    done
+    {   ret=$?
+        [ $ret -eq 130 ] ||     # INT
+        [ $ret -eq 139 ] ||     # KILL
+        [ $ret -eq 143 ]        # TERM
+    } && break
 done
 

@@ -6,6 +6,7 @@
     script_p="$(readlink -f "$0")" ||
     script_p="$0"
 lib_d="${script_p%/*/*/*}/lib"
+. "$lib_d/output.sh"
 . "$lib_d/prog.sh"
 . "$lib_d/status.sh"
 
@@ -32,26 +33,16 @@ case "${0##*/}" in
     "mount.iso")
 	# find iso file
 	case "$1" in
-	    "-f"|"-i")
-		iso_file="$2"
-		;;
-	    *)
-		iso_file="$1"
-		;;
+	    "-f"|"-i")  shift;;
 	esac
+        iso_file="$(readlink -f "$1")"
 	# check it exists
-	[ -f $iso_file ] || {
-	    echo "Error: Provide valid iso file" >&2
-	    exit 1
-	}
+	[ -f "$iso_file" ] || die "Invalid iso file: $iso_file"
 	# define mount directory
 	mount_dir="/media/cd-$(basename "$iso_file" .iso)"
 	# check not already mounted
-	grep -e "/dev/loop[0-9][ 	]$mount_dir" </proc/mounts >/dev/null 2>&1 &&
-	    {
-		echo "Error: $mount_dir already mounted" >&2
-		exit 1
-	    }
+	grep -qe "/dev/loop[0-9][ 	]$mount_dir" </proc/mounts &&
+            die "Already mounted: $mount_dir"
 	# make directory if needed
 	[ -d "$mount_dir" ] || mkdir "$mount_dir"
 	mount -o loop,noatime,ro "$iso_file" "$mount_dir"
@@ -60,30 +51,18 @@ case "${0##*/}" in
     "umount.iso")
 	# find mount directory
 	case "$1" in
-	    "-a")
-		# allow 'all' switch
-		umount /media/cd-*
-		exit
-		;;
-	    "-d")
-		mount_dir="$2"
-		;;
-	    *)
-		mount_dir="$1"
+	    "-a")       umount /media/cd-* && rmdir /media/cd-*; exit;;
+	    "-d")       shift;;
 	esac
+        mount_dir="$1"
 	# if none specified and only one - use that
 	[ -z "$mount_dir" ] && [ $(ls -d /media/cd-* 2>/dev/null | wc -l) -eq 1 ] &&
 	    mount_dir="$(ls -d /media/cd-*)"
 	# check it exists
-	[ -d $mount_dir ] || {
-	    echo "Error: Provide valid mount point" >&2
-	    exit 1
-	}
+	[ -d "$mount_dir" ] || die "Invalid mount point: $mound_dir"
 	# check if mounted
-	grep -e "/dev/loop[0-9][ 	]$mount_dir" </proc/mounts >/dev/null 2>&1 || {
-	    echo "Error: $mount_dir is not mounted" >&2
-	    exit 1
-	}
+	grep -q "/dev/loop[0-9][ 	]${mount_dir%/}" </proc/mounts ||
+	    die "Not mounted: $mount_dir"
 	# unmount directory
 	umount "$mount_dir"
 	# remove unneeded directory
