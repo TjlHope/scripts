@@ -1,0 +1,115 @@
+#!/bin/sh -e
+# git-sparse
+#       manages the sparse-ness of the current repository
+
+usage() {
+    [ -n "$*" ] && echo "$*" >&2
+    cat >&2 <<- _EOF
+	Usage: git sparse [-h] < -l | <[=]|+|-> <[!]pattern>... >...
+	  Perform a sparse checkout of the current repository. This only checks
+	  out the files that match the given patterns.
+	
+	Arguments:
+	  -h, -?, --help
+	        Output this help message and exit.
+	  -l, --list
+	        List the current patterns (implies -n).
+	  -n, --no-checkout
+	        Don't perform the sparse checkout.
+	  -b[ ]<branch>, --branch[= ]<branch>
+	        Checkout <branch> instead of HEAD.
+	  =, -e, --replace              (default)
+	        Replace all current patterns with all the following ones.
+	  --replace=<pattern>
+	        Replace all current patterns with the given one.
+	  +, -a, --add
+	        Add all the following patterns to the current ones.
+	  --add=<pattern>
+	        Add the given pattern to the current ones.
+	  -, -r, --rm, --remove
+	        Remove any pattern from the current ones that match any of the
+	        following regexs.
+	  --rm=<regex>, --remove=<regex>
+	        Remove any pattern from the current ones that match the given
+	        regex.
+	  --    Treat all following arguments as patterns (or regexs if
+	        --remove ing).
+	
+	Patterns:
+	  Patterns are standard glob(3) patterns, optionally preceded by a '!'
+	  to negate the match.
+	_EOF
+    exit ${1+1}
+}
+
+# Exports the environment variables GIT_DIR and GIT_WORK_TREE, then sets the
+# location of the sparse-checkout file as sparse_checkout
+set_sparse_checkout() {
+    : "${GIT_DIR:=${GIT_WORK_TREE:=$(pwd)}/.git}"
+    : "${GIT_WORK_TREE:=${GIT_DIR%/.git}}"
+    while [ ! -d "$GIT_DIR" ]
+    do
+        GIT_WORK_TREE="${GIT_WORK_TREE%/*}"
+        [ -n "$GIT_WORK_TREE" ] || {
+            echo "fatal: Not a git repository" >&2
+            exit 128
+        }
+        GIT_DIR="$GIT_WORK_TREE/.git"
+    done
+    export GIT_DIR GIT_WORK_TREE
+
+    local sparse=
+    sparse="$(git config --get core.sparseCheckout)" && [ "$sparse" = true ] ||
+        git config core.sparseCheckout true
+
+    sparse_checkout="$GIT_DIR/info/sparse-checkout"
+}
+unset sparse_checkout   # make sure we find it the first time round
+
+
+perform() {     # TODO: read all into memory, manipulate, write out once
+    [ -n "$sparse_checkout" ] || set_sparse_checkout
+    local pattern="$2"  # no action="$1" because of 'replace' fudging
+    case "$pattern" in
+        "")     :;;
+        \**)    :;;     # generally, if you don't lead with an explicit '*'
+        /*)     :;;     # you actually mean /$2 (from the root of the repo)
+        *)      pattern="/$pattern";;
+    esac
+    case "$1" in
+        l)      cat "$sparse_checkout";;
+        =)      echo "$pattern" > "$sparse_checkout"; action="+";;
+        +)      echo "$pattern" >> "$sparse_checkout";;
+        -)      sed -i "/^$pattern$/d" "$sparse_checkout";;
+    esac
+}
+action="="      # by default we replace
+branch="HEAD"   # by default checkout HEAD
+while [ $# -gt 0 ]
+do
+    case "$1" in
+        --)                     shift; break;;
+        -h|-\?|--help)          usage;;
+        -l|--list)              perform "l"; branch="";;
+        -n|--no-checkout)       branch="";;
+        -b|--branch)            branch="$2"; shift;;
+        -b?*)                   branch="${1#-b}";;
+        --branch=*)             branch="${1#--branch=}";;
+        +|-a|--add)             action="+";;
+        --add=*)                perform "+" "${1#--add=}";;
+        -|-r|--rm|--remove)     action="-";;
+        --rm=*)                 perform "-" "${1#--rm=}";;
+        --remove=*)             perform "-" "${1#--remove=}";;
+        =|-e|--replace)         action="=";;
+        --replace=*)            perform "=" "${1#--remove=}";;
+        *)                      perform "$action" "$1";;
+    esac
+    shift
+done
+while [ $# -gt 0 ]      # to handle the -- case
+do
+    perform "$action" "$1"
+    shift
+done
+
+[ -n "$branch" ] && git checkout "$branch"

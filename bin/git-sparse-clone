@@ -1,0 +1,112 @@
+#!/bin/sh -e
+# git-sparse-clone
+#       clones a git repository in a sparse fashion
+
+usage() {
+    [ -n "$*" ] && echo "$*" >&2
+    cat >&2 <<- _EOF
+	Usage: git sparse-clone [-h] <clone arguments> [--] <sparse arguments>
+	  Clones and sparsely checks out a repository. This is done by calling
+	    git clone [options] --no-checkout <repo> [<dir>]
+	  followed by
+	    git sparse <pattern>...
+	
+	Note: Although technically optional, the -- separator is strongly
+	      advised to avoid the first pattern for git-sparse being
+	      interpreted as the directory for git-clone.
+	
+	Arguments:
+	  -h, -?, --help
+	        Output this help message, and those of clone and sparse.
+	  --    Preceding arguments are for clone, following for sparse.
+	  -n, --no-checkout
+	        Don't create a checkout (passed to both clone and sparse).
+	  -b[ ]<branch>, --branch[= ]<branch>
+                Checkout <branch> instead of HEAD (passed to sparse).
+	
+	
+	_EOF
+    git clone -h >&2 || :
+    git sparse -h >&2
+    exit ${1+1}
+}
+
+# Basic argument parsing for both git-clone and git-sparse
+unset branch no_checkout repo GIT_DIR GIT_WORK_TREE
+# Although it's OK to use the GIT_* variables directly, they cannnot be
+# exported (and therefore picked up by git commands) until *after* the clone.
+sep=0 i=0
+while [ $i -lt $# ]     # clone opts/args
+do  a="$1"; shift
+    case "$a" in
+        -h|-\?|--help)          usage;;
+        --)                     [ -n "$repo" ] && sep=$i && break;;
+        -n|--no-checkout)       no_checkout="$a";;
+        -b|--branch)            branch="$1"; shift;;
+        -b?*)                   branch="${a#-b}";;
+        --branch=*)             branch="${a#--branch=}";;
+        --seperate-git-dir)     GIT_DIR="$1"; shift
+                                set -- "$@" "$a" "$GIT_DIR";;
+        --seperate-git-dir=*)   GIT_DIR="${a#--seperate-git-dir=}"
+                                set -- "$@" "$a";;
+        --template|--reference|-o|--origin|-u|--upload-pack|--depth|-c|--config)
+                                v="$1" i=$(( $i + 2)); shift
+                                set -- "$@" "$a" "$v";;
+        -?*)                    i=$(( $i + 1 ))
+                                set -- "$@" "$a";;
+        *)                      if [ -z "$repo" ]; then repo="$a"
+                                elif [ -z "$GIT_WORK_TREE" ]; then
+                                    GIT_WORK_TREE="$a"
+                                elif [ $sep -eq 0 ]; then sep=$i && break
+                                fi
+                                i=$(( $i + 1 ))
+                                set -- "$@" "$a";;
+    esac
+done
+while [ $i -lt $# ]     # sparse opts/args
+do  a="$1"; shift
+    case "$a" in
+        -h|-\?|--help)          usage;;
+        --)                     break;;
+        -n|--no-checkout)       no_checkout="$a";;
+        -b|--branch)            branch="$1"; shift;;
+        -b?*)                   branch="${a#-b}";;
+        --branch=*)             branch="${a#--branch=}";;
+        *)                      i=$(( $i + 1 ))
+                                set -- "$@" "$a";;
+    esac
+done
+while [ $i -lt $# ]     # sparse args
+do  a="$1"; shift
+    i=$(( $i + 1 ))
+    set -- "$@" "$a"
+done
+
+case "$GIT_WORK_TREE" in
+    "") GIT_WORK_TREE="${repo%/}"               # strip a trailing /
+        GIT_WORK_TREE="${GIT_WORK_TREE##*/}"    # remove leading URL/path
+        GIT_WORK_TREE="${GIT_WORK_TREE%.git}"   # strip .git suffix
+        GIT_WORK_TREE="$(pwd)/${GIT_WORK_TREE%/}";;
+    /*) GIT_WORK_TREE="${GIT_WORK_TREE%/}";;
+    *)  GIT_WORK_TREE="$(pwd)/${GIT_WORK_TREE%/}";;
+esac
+unset a v i repo        # don't pollute the environment
+
+# Have them as functions so we can get a copy of "$@"
+git_clone() {
+    local i=0 a=
+    while [ $i -lt $sep ]
+    do  i=$(( $i + 1 ))
+        a="$1"; shift
+        set -- "$@" "$a"
+    done
+    shift $(( $# - $sep ))
+    git clone ${no_checkout--n} ${branch+-b "$branch"} "$@"
+}
+git_sparse() {
+    shift $sep
+    export GIT_DIR GIT_WORK_TREE        # So we don't need to cd, etc.
+    git sparse $no_checkout ${branch+-b "$branch"} "$@"
+}
+
+git_clone "$@" && git_sparse "$@"
