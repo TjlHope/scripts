@@ -52,12 +52,12 @@ case "${0##*/}" in
 	    $excludes $ops \
 	    ${pkgs:-@world --oneshot $vcs_pkgs}
 	comb_st
-	info "	Emerge exit status: $st_last"
+	info "	Emerge exit status: $_st_last"
 
 	# Catch errors and decide action
 	echo "$ops" | sed -ne "/\(\<-[^-]\?\S*p\|\<--pretend\>\)/q1" &&
-	    [ $st_last -ne 130 ] && [ $st_last -ne 102 ] ||
-	    exit $st_total
+	    [ $_st_last -ne 130 ] && [ $_st_last -ne 102 ] ||
+	    exit $_st_total
 
 	# find necesary module updates
 	update_mods="$(tac /var/log/emerge.log | sed -ne \
@@ -76,21 +76,21 @@ case "${0##*/}" in
 	done
 
 	### Remove uneccesary dependencies
-	[ $st_last -eq 0 ] &&
+	[ $_st_last -eq 0 ] &&
 	    "$_emerge" --quiet --depclean $ops
 	comb_st
-	info "	depclean exit status: $st_last"
+	info "	depclean exit status: $_st_last"
 
 	# Catch errors and decide action
-	[ $st_last -ne 130 ] && [ $st_last -ne 102 ] || exit $st_total
+	[ $_st_last -ne 130 ] && [ $_st_last -ne 102 ] || exit $_st_total
 
 	### Rebuild packages with broken link level dependencies
 	$_revdep "$@"		# rest of them for rebuild
 	comb_st
-	info "	revdep-rebuild exit status: $st_last"
+	info "	revdep-rebuild exit status: $_st_last"
 
 	# Catch errors and decide action
-	[ $st_last -ne 130 ] && [ $st_last -ne 102 ] || exit $st_last
+	[ $_st_last -ne 130 ] && [ $_st_last -ne 102 ] || exit $_st_last
 
 	# can't be bothered to try and parse ops for these as well
 
@@ -113,7 +113,7 @@ case "${0##*/}" in
 	    esac
 	    comb_st
 	    # Catch errors and decide action
-	    [ $st_last -ne 130 ] && [ $st_last -ne 102 ] || exit $st_last
+	    [ $_st_last -ne 130 ] && [ $_st_last -ne 102 ] || exit $_st_last
 	done
 
 	### Clean uneeded tar.bz2's
