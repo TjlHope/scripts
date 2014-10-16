@@ -1,0 +1,29 @@
+#!/bin/sh
+# SCRIPT_D/bin/soproxy
+# Uses socat to proxy using an HTTP CONNECT
+
+script_p="$(readlink -f "$0")"
+lib_d="${script_p%/*/*}/lib"
+. "$lib_d/output.sh"
+
+socat="$(command -v socat)" ||
+    die "socat command not available"
+
+usage() { echo "Usage: $0 <host> <port>" >&2; exit 1; }
+[ $# -ge 2 ] || usage
+host="$1" port="$2"; shift 2
+
+proxy="${http_proxy-${HTTP_PROXY-localhost}}"
+unset proxyport
+case "$proxy" in
+    http://*)   proxy="${proxy#http://}";;
+    https://*)  proxy="${proxy#https://}";;
+    *://*)      die "Invalid scheme:" "$proxy";;
+esac
+case "$proxy" in
+    *:[0-9]*)   proxyport="${proxy#*:}" proxy="${proxy%:[0-9]*}";;
+esac
+
+exec "$socat" STDIO \
+    PROXY:"$proxy:$host:$port,${proxyport+proxyport=$proxyport}" \
+    "$@"
