@@ -3,11 +3,11 @@
 # Small script to manipulate the display in several ways.
 
 prog="$(command -v xrandr)"
-posistion="below"
+posistion="right-of"
 
 case "${0##*/}" in
     "display.dual")
-	display='LVDS1'
+	display='DVI-0'
 	secondary="$(${prog} --query | \
 	    sed -ne "/^\(Screen\|DIN\|${display}\|\s\)/"'!s/^\(\S\+\).*/\1/p')"
 	# TODO: secondary will currently select *all* other screens :-s 

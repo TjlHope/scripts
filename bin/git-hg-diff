@@ -54,7 +54,8 @@ get_hg_rev() { # <git_hash>
     hg_hash="$(git notes show "$git_hash" 2>/dev/null || :)"
     [ -z "$hg_hash" ] && {
         printf "$hash_msg" "$git_hash" >&2
-        read hg_hash
+	$stdin ||	# can't read it, so just assume HEAD
+	    read hg_hash
     }
     [ -n "$hg_hash" ] && echo "$hg_hash" || :   # so it works with set -e
 }
@@ -67,8 +68,15 @@ hg_from="$(get_hg_rev "$from")"
     git diff --full-index "$@"
 } | sed -e "
     \:^diff --git a/\(.*\) b/\1$: {
-        s:^diff --git a/\(.*\) b/\1$:diff -r $hg_from ${hg_to:+-r $hg_to} \1:
+        s:^diff --git a/\(.*\) b/\1$:diff ${hg_from:+-r $hg_from} ${hg_to:+-r $hg_to} \1:
+	n
+	\:^new file .*$: N
+	\:^new file .*\\nindex .*$: d
     }
-    \:^\(index\|new file\) .*$: {
-        d
+    \:^diff --git: {
+	s:^diff --git a/.* b/\(.*\)$:diff ${hg_from:+-r $hg_from} ${hg_to:+-r $hg_to} \1:
+	n
+	\:^similarity index .*$: N
+	\:^\(similarity index .*\n\)\?\(rename\|copy\) from .*$: N
+	\:^\(similarity index .*\n\)\?\(rename\|copy\) from .*\n\2 to .*$: d
     }"
