@@ -11,6 +11,13 @@ lib_d="${script_p%/*/*}/lib"
 . "${lib_d}/get_prog.sh"
 . "${lib_d}/notify.sh"
 
+script_n="${script_p##*/}"
+[ -t 1 ] || {   # if no stdout, then LOG
+    LOG="$HOME/.log/$script_n.log"
+    exec 2>&1 >>"$LOG"
+    date "+%n%c%tStarting $script_n..."
+}
+
 screensaver_watch="$(first_cmd "xscreensaver-command -watch")" ||
     die "Cannot find watch command"
 get_timeout() {
