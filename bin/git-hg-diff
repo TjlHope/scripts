@@ -67,7 +67,7 @@ hg_from="$(get_hg_rev "$from")"
     git diff --full-index "$@"
 } | sed -e "
     \:^diff --git a/\(.*\) b/\1$: {
-        s:^diff --git a/\(.*\) b/\1$:diff -r $hg_from $hg_to\1:
+        s:^diff --git a/\(.*\) b/\1$:diff -r $hg_from ${hg_to:+-r $hg_to} \1:
     }
     \:^\(index\|new file\) .*$: {
         d
