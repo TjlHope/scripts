@@ -1,0 +1,30 @@
+#!/usr/bin/env python
+# SCRIPTS_DIR/bin/t2csv
+#
+# Converts between different csv dialects, written in response to
+# http://stackoverflow.com/questions/356578/how-to-output-mysql-query-results-in-csv-format
+
+import csv
+
+def convert(infile, outfile, indialect=csv.excel_tab, outdialect=csv.excel):
+    r = csv.DictReader(infile, dialect=indialect)
+    w = csv.DictWriter(outfile, r.fieldnames, dialect=outdialect,
+                       quoting=csv.QUOTE_MINIMAL)
+    w.fieldnames != None and w.writeheader()
+    w.writerows(r)
+
+if __name__ == '__main__':
+    import sys
+    if (len(sys.argv) > 1):
+        import optparse as op
+        p = op.OptionParser()
+        dialect_opts = {
+            "metavar": "DIALECT",
+            "type": "choice",
+            "choices": csv.list_dialects(),
+        }
+        p.add_option("-i", "--indialect", "--input-dialect", **dialect_opts)
+        p.add_option("-o", "--outdialect", "--output-dialect", **dialect_opts)
+        convert(sys.stdin, sys.stdout, **vars(p.parse_args()[0]))
+    else:
+        convert(sys.stdin, sys.stdout)
