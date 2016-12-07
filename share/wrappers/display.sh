@@ -9,7 +9,7 @@ case "${0##*/}" in
     "display.dual")
 	display='LVDS1'
 	secondary="$(${prog} --query | \
-	    sed -ne "/^\(Screen\|${display}\|\s\)/"'!s/^\(\w\+\).*/\1/p')"
+	    sed -ne "/^\(Screen\|DIN\|${display}\|\s\)/"'!s/^\(\S\+\).*/\1/p')"
 	# TODO: secondary will currently select *all* other screens :-s 
 	;;
 
@@ -30,7 +30,7 @@ case "${0##*/}" in
 	;;
 
     "display.rotate")
-	#TODO: allow reletive rotation
+	#TODO: allow relative rotation
 	case "${1}" in
 	    ""|"l"|"left"|"-90")	# default
 		rotate="left";;
@@ -39,7 +39,7 @@ case "${0##*/}" in
 	    "i"|"invert"|"180")
 		rotate="inverted";;
 	    *)
-		echo "Usage: $0 [left|right|inver]" 1>&2
+		echo "Usage: $0 [left|right|invert]" 1>&2
 		echo "	Also accepts angle for action." 1>&2
 	esac
 	;;

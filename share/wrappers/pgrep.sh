@@ -17,27 +17,20 @@ case "$*" in
 esac
 
 case "${0##*/}" in
-    'lpgrep')
-	exec $prog -l "$@"
-	;;
-    'cpgrep')
-        pids="$($prog "$@" 2>&1)" || {
-            [ -n "$pids" ] &&   # error message
-                usage 1 ||
-                exit 1
-        }
-	for pid in $pids
-	do
-	    echo -n "$pid: "
-	    sed -e 's/\x0/ /g' /proc/$pid/cmdline
-	    echo
-	done
-	;;
-    'fpgrep')
-	exec $prog -lf "$@"
-	;;
-    *)
-	echo "Invalid program: $0" >&2
-	exit 1
+    'lpgrep')   exec "$prog" -l "$@";;
+    'cpgrep')   full='';;
+    'fpgrep')   full='-f';;
+    *)  echo "Invalid program: $0" >&2
+	exit 1;;
 esac
 
+pids="$($prog $full "$@" 2>&1)" && {
+    for pid in $pids
+    do
+        [ $pid -eq $$ ] ||
+            sed -e 's/\x0/ /g' -e "s/^.*$/$pid &\n/" /proc/$pid/cmdline
+    done
+} || {
+    [ -n "$pids" ] &&   # error message
+        usage 1
+}

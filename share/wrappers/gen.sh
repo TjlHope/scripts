@@ -59,9 +59,10 @@ then
     info "Generating: $gen_f"
     info "      from: $src_f"
     [ -d "$gen_d" ] || mkdir "$gen_d"   # no -p as $src_d must exist here
+    args="$(sed -ne '1,5{s/^.*gen\.sh\s*:\s*\([^:]*\):\?\s*$/\1/p}' "$src_f")"
     case "$src_f" in            # let's try and be polite about size
-        *.c)            gcc -Os -s "$src_f" -o "$gen_f";;
-        *.c[px][px])    g++ -Os -s "$src_f" -o "$gen_f";;
+        *.c)            gcc -Os -s "$src_f" -o "$gen_f" $args;;
+        *.c[px][px])    g++ -Os -s "$src_f" -o "$gen_f" $args;;
         *)              die "Don't know how to generate from: $src_f";;
     esac || die "Failed to generate from: $src_f"
 fi

@@ -2,7 +2,7 @@
 # SCRIPTS_DIR/share/wrappers/find.sh
 
 # Get Wrapper specific Opts:
-_name="name"    # default to case-sensitive search
+unset icase
 case "${0##*/}" in
     "find.iplayer")
 
@@ -48,7 +48,7 @@ case "${0##*/}" in
         while [ $# -gt 0 ]
         do a="$1"; shift
             case "$a" in
-                -i)     _name="iname"; continue;;
+                -i)     icase=i; continue;;
                 -e)     pattern="$1"; shift;;
                 '*'*)   pattern="$a";;
                 *'*')   pattern="$a";;
@@ -100,7 +100,7 @@ do
 done
 
 # Execute find | sort
-#echo "find $pre_opts $paths -$_name $name_regexp $@"
-exec find $opts $paths -$_name "$pattern" $xfind $@ |
+#echo "find $pre_opts $paths -${icase}name $name_regexp $@"
+exec find $opts $paths -${icase}name "$pattern" $xfind $@ |
     sort $xsort
 

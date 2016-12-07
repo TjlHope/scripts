@@ -165,7 +165,8 @@ do
     # If confirmation required, prompt and check
     while ${ask}
     do
-	read -p "Perform rename? (y/n/a/q) " str
+	printf "Perform rename? (y/n/a/q) "
+	read str
 	case "${str}" in
 	    [Yy]*)	perform=true;;
 	    [Nn]*)	perform=false;;
