@@ -1,0 +1,211 @@
+#!/bin/sh
+###############################################################################
+# signPDF: A simple way to add a signature image to a pdf under linux.
+#          The inserted signature has the same aspect ratio than the original.
+###############################################################################
+# Description:
+#   The script uses xv to display the page where the signature should be
+#   inserted. Click on two points inside xv with the left-mouse-button to
+#   define the signature's box corner. Don't maintain the mouse. It has to be
+#   two single clicks. The order of the click does not matter. Only the two
+#   last clicks are considered. Press q to quit xv. The signed file is
+#   generated in the same folder than the original, without overriding it. The
+#   signature keeps the same proportion than the original. You can move, but
+#   should not resize xv window.
+#
+# Written by : Emmanuel Branlard
+# Date : April 2012
+# Updated by : Tom Hope
+# Date : February 2017
+#
+# Dependencies :  xv, pdftk, imagemagick .
+# License : Feel free to modify and adapt it
+#
+# Usage:
+#   1st arg: pdf file 
+#   2nd arg: page number to sign (default: end)
+#   3rd arg: signature file (default: ~/.sig/sig.png
+#   
+#
+# Example: Add a signature to file "my file.pdf" on page 5:
+# ./signPDF "my file.pdf" 5 "signature.png" 
+
+set -eu
+
+NL='
+'
+name="${0##*/}"
+
+usage() {
+    local ret=$?
+    cat <<- _EOF
+	Usage: 
+	    $name <PdfFile> [PageNumber [SignatureFile]]
+	Example:
+	    $name \"my file.pdf\" 5 signature.png
+
+	Look at the source for more informations.
+	_EOF
+    exit $ret
+}
+
+ret() { return "$1"; }
+die() {
+    local ret=$?
+    [ $ret -gt 0 ] || ret=1
+    echo "ERROR: $*" >&2
+    exit $ret
+}
+
+if [ $# -lt 1 ] || [ "$1" = -h ] || [ "$1" = --help ]
+then
+    usage
+fi
+
+
+command -v pdftk >/dev/null ||
+    die "Command 'pdftk' not found"
+command -v convert >/dev/null ||
+    die "Command 'convert' not found"
+command -v xv >/dev/null ||
+    die "Command 'xv' not found"
+command -v composite >/dev/null ||
+    die "Command 'composite' not found"
+
+if [ "$1" = -x ]
+then	# enable shell debug logging
+    shift
+    set -x
+fi
+
+if [ -f "$1" ]
+then
+    file="$(readlink -f "$1")"
+else
+    die "No such PDF file:" "$1"
+fi
+out="${file%.[pP][Dd][Ff]}_signed.pdf"
+
+if [ $# -gt 1 ]
+then
+    case "$2" in
+	end|[0-9]|[0-9][0-9]|[0-9][0-9][0-9])	page="$2";;
+	*)	die "Not a page number:" "$2"
+    esac
+else
+    page=end
+fi
+
+[ $# -gt 2 ] &&
+    sig="$(readlink -f "$3")" ||
+    sig="$(readlink -f "$HOME/.sig/sig."* 2>/dev/null)"
+[ -f "$sig" ] ||
+    die "No such Signature file:" "$sig"
+
+
+echo " -------------- Called with:  -------------- 
+File : $file
+Page : $page
+Signature: $sig "
+
+
+tmp_d="$(mktemp -td "$name.XXXXX")"
+# clean up tmp dir on exit
+trap "rm -rf '$tmp_d'" 0
+cd "$tmp_d"
+
+echo "-------------- Extracting page from pdf   -----------------"
+pdftk "$file" cat "$page" output "to_sign.pdf"
+convert -density 100 "to_sign.pdf" "to_sign.png"
+
+
+echo "-------------- !!! Click on two points defining the signature box -----------------"
+echo "-------------- !!! Don't resize the window - you can move it though -----------------"
+echo "--------------        Press q to exit       -----------------"
+clicks="$(xv -nolimits -D 1 "to_sign.png" 2>&1 | sed -ne '
+	/\<ButtonPress\>.*\<button=1\>/ {
+	    s/^.*\<ButtonPress\s\+\S\+\s\+\([0-9]\+,[0-9]\+\),.*$/\1/p
+	    g; s/.*/&./; h
+	    /.\{2,\}/ q
+	}
+	$ { q1; }
+    ')" && [ -n "$clicks" ] || die "Could not determine signature position"
+click1="${clicks%$NL*}" click2="${clicks#*$NL}"
+x1="${click1%,*}" y1="${click1#*,}" x2="${click2%,*}" y2="${click2#*,}"
+
+# Dimensions of the rectangle specified by the user.
+dx=$(( x2 - x1 ))
+dy=$(( y2 - y1 ))
+
+# Check user input, and reverse if they've gone up instaed of down.
+switch() {
+    while [ $# -gt 2 ]
+    do
+	eval "local temp=\"\$$1\""
+	eval "$2=\"\$$1\""
+	eval "$1=\"\$temp\""
+	shift 2
+    done
+}
+[ $dy -ge 0 ] || {
+    switch y1 y2
+    dy=$(( y2 - y1 ))
+}
+[ $dx -ge 0 ] || {
+    switch x1 x2
+    dx=$(( x2 - x1 ))
+}
+#dx=$(( dx + dx/3 )) dy=$(( dy + dy/3 ))
+# Fiddle the coords as it doesn't seem to work otherwise
+x=$(( x1 + dx*2/3 )) y=$(( y1 + dy*2/3 ))
+
+# The following because I chose to double the density
+# dx=`expr $dx \* 2`
+# dy=`expr $dy \* 2`
+# y1=`expr $y1 \* 2`
+# x1=`expr $x1 \* 2`
+echo "-------------- Inserting Signature, lower left corner at: +$x1+$y2"
+echo "--------------                      fitting within      : ${dx}x${dy}"
+
+# Resize the signature,
+# ... and get a clear background
+convert "to_sign.png" \
+    -fill White -colorize 100% -alpha Transparent \
+    "bg.png"
+# ... to compose with the signature,
+composite -geometry "${dx}x${dy}+${x1}+${y}" \
+    "$sig" "bg.png" \
+    "sig+bg.png"
+# ... then convert back to a pdf,
+convert -density 100 "sig+bg.png" "sig+bg.pdf"
+# ... so that pdftk can use it as a stamp
+pdftk "to_sign.pdf" stamp "sig+bg.pdf" output "signed.pdf"
+
+# Calculate the required page ranges
+case "$page" in
+    end)
+	end=$(pdftk "$file" dump_data |
+	    sed -ne 's/^NumberOfPages:\s\+\([0-9]\+\).*$/\1/p')
+	[ "$end" -gt 0 ] 2>/dev/null ||
+	    die "Cannot determine 'end' page number"
+	start="1-$(( end - 1 ))" finish="";;
+    1)
+	start="" finish="2-end";;
+    *)
+	start="1-$(( page - 1 ))" finish="$(( page + 1 ))-end";;
+esac
+
+# Finally cat the signed page and the rest of the document together.
+pdftk "F=$file" "S=signed.pdf" \
+    cat ${start:+"F$start"} S ${finish:+"F$finish"} \
+    output "$out"
+
+
+echo "-------------- File '$out' created  ------------- "
+echo "-------------- Done -------------"
+
+# Manually clean up, and get rid of the trap
+# (makes testing easier because you can just comment out the rm line)
+rm -rf "$tmp_d"
+trap - 0
+
