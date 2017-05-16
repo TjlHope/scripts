@@ -1,6 +1,9 @@
 #!/bin/sh
 # SCRIPTS_DIR/share/wrappers/find.sh
 
+NL="
+"
+
 # Get Wrapper specific Opts:
 unset icase
 case "${0##*/}" in
@@ -11,8 +14,8 @@ case "${0##*/}" in
 	do
 	    case "${a-$1}" in
 		-*s*)
-		    xfind='-printf %k\t%p\n'
-		    xsort="-k 2 -t \	"
+		    xfind="-printf$NL%k\\t%p\\n"
+		    xsort="-k2$NL-t\	"
 		    case "$1" in
 			-s)
 			    shift;;
@@ -71,10 +74,10 @@ while [ -n "$1" ]
 do
     case "$1" in
 	"-H"|"-L"|"-P"|"-O"?)
-	    opts="$opts $1"
+	    opts="$opts$NL$1"
 	    ;;
 	"-D")
-	    opts="$opts $1 $2"
+	    opts="$opts$NL$1$NL$2"
 	    shift
 	    ;;
 	*)
@@ -93,7 +96,7 @@ do
 	    break
 	    ;;
 	*)
-	    paths="$paths $1"
+	    paths="$paths$NL$1"
 	    ;;
     esac
     shift
@@ -101,6 +104,7 @@ done
 
 # Execute find | sort
 #echo "find $pre_opts $paths -${icase}name $name_regexp $@"
-exec find $opts $paths -${icase}name "$pattern" $xfind $@ |
+IFS="$NL"
+exec find $opts $paths -${icase}name "$pattern" $xfind "$@" |
     sort $xsort
 
