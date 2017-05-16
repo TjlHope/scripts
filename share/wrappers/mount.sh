@@ -106,7 +106,7 @@ case "${0##*/}" in
 	else
 	    for mp in /media/* "/run/media/$USER/"*
 	    do
-		[ -d "$mp" ] &&
+		[ -d "$mp" ] && mountpoint -q "$mp" &&
 		    gvfs-mount -u "$(readlink -f "$mp")" ||
 		    inc_st
 	    done
