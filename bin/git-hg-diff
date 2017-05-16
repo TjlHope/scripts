@@ -3,8 +3,8 @@
 #       replaces the hashes in the given (or generated) git diff with their
 #       mercurial counterparts.
 
-[ "$(git notes get-ref)" = "refs/notes/hg" ] || {
-    echo "Error: The notes reference isn't 'refs/notes/hg'," >&2
+git notes --ref=refs/notes/hg >/dev/null 2>&1 || {
+    echo "Error: Couldn't find notes reference 'refs/notes/hg'," >&2
     echo "       so the mercuiral hashes cannot be retrieved." >&2
     exit 1
 }
@@ -51,7 +51,7 @@ hash_msg="Cannot determine mercurial hash for %s,"
 hash_msg="$hash_msg\\nenter manually [blank for branch tip]: "
 get_hg_rev() { # <git_hash>
     local git_hash="$1" hg_hash
-    hg_hash="$(git notes show "$git_hash" 2>/dev/null || :)"
+    hg_hash="$(git notes --ref=refs/notes/hg show "$git_hash" 2>/dev/null || :)"
     [ -z "$hg_hash" ] && {
         printf "$hash_msg" "$git_hash" >&2
 	$stdin ||	# can't read it, so just assume HEAD
@@ -70,13 +70,17 @@ hg_from="$(get_hg_rev "$from")"
     \:^diff --git a/\(.*\) b/\1$: {
         s:^diff --git a/\(.*\) b/\1$:diff ${hg_from:+-r $hg_from} ${hg_to:+-r $hg_to} \1:
 	n
-	\:^new file .*$: N
-	\:^new file .*\\nindex .*$: d
+	\:^new file .*$: { N
+	    \:^new file .*\\nindex .*$: d
+	}
+	\:^index .*$: d
     }
     \:^diff --git: {
 	s:^diff --git a/.* b/\(.*\)$:diff ${hg_from:+-r $hg_from} ${hg_to:+-r $hg_to} \1:
 	n
-	\:^similarity index .*$: N
-	\:^\(similarity index .*\n\)\?\(rename\|copy\) from .*$: N
-	\:^\(similarity index .*\n\)\?\(rename\|copy\) from .*\n\2 to .*$: d
+	\:^similarity index .*$: { N
+	    \:^\(similarity index .*\n\)\?\(rename\|copy\) from .*$: { N
+		\:^\(similarity index .*\n\)\?\(rename\|copy\) from .*\n\2 to .*$: d
+	    }
+	}
     }"
