@@ -1,0 +1,75 @@
+#!/bin/sh
+# vi: et sw=4 sts=4 ts=8
+set -eu
+
+BIN="01"
+OCT="012345678"
+DEC="0123456789"
+HEX="0123456789abcdef"
+ALPHA="abcdefghijklmnopqrstuvwxyz"
+
+msg() {
+    local ret=$?
+    [ $ret -eq 0 ] && echo "$@" || echo "$@" >&2
+    return $ret
+}
+
+encode() {
+    [ $# -eq 2 ] || msg "Usage: encode <codec> <num>" || return
+    local codec="$1" base="${#1}" num="$2"
+    [ "$base" -ge 2 ] || msg "ERROR: codec must be >= 2 chars" || return
+    [ "$num" -ge 0 ] 2>/dev/null ||
+        msg "INVALID: must be a non-negative decimal: $num" || return 2
+
+    [ "$num" -eq 0 ] && echo "$codec" | cut -c 1 && return
+    local a="$num" str=""
+    while [ "$a" -gt 0 ]
+    do
+        str="$(echo "$codec" | cut -c "$(( (a % base) + 1 ))")$str"
+        a=$(( a / base ))
+    done
+    echo "$str"
+    return
+}
+
+decode() {  # codec str
+    [ $# -eq 2 ] || msg "Usage: decode <codec> <str>" || return
+    local codec="$1" base="${#1}" str="$2"
+    [ "$base" -ge 2 ] || msg "ERROR: codec must be >= 2 chars" || return
+    [ -n "$str" ] || msg "INVALID: no value" || return
+
+    local a="$str" num=0 rest="" c="" pre="" idx=""
+    while [ -n "$a" ]
+    do
+        rest="${a#?}"
+        c="${a%$rest}"
+        a="$rest"
+        pre="${codec%%$c*}"
+        idx="${#pre}"
+        [ "$idx" -lt "$base" ] || { # already tested above
+            echo "INVALID: $str as '$c' not in codec: $codec" >&2
+            return 2
+        }
+        num=$(( num * base + idx ))
+    done
+    echo "$num"
+    return 0
+}
+
+case "${0##*/}" in  # allow running directly as a symlink
+    encode[_.]*|decode[_.]*)    set -- "${0##*/}" "$@";;
+esac
+case "${1-}" in
+    encode[_.]*|decode[_.]*)
+        set -e
+        name="$1"; shift
+        func_name="${name%%[_.]*}"
+        codec_name="$(echo "${name#*[_.]}" | tr '[:lower:]' '[:upper:]')"
+        eval "codec=\$$codec_name"
+        [ -n "$codec" ] || msg "ERROR: no such codec: \$$codec_name" || exit
+        for a in "$@"
+        do  "$func_name" "$codec" "$a"
+        done
+        ;;
+    *)  :;;     # assume we're being sourced, so do nothing
+esac
