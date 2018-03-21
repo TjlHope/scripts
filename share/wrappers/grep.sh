@@ -12,7 +12,7 @@ case "${0##*/}" in
 	sopts="-A 2 -B 2"
 	;;
     rgrep)
-	sopts="-R"
+	sopts="-R --exclude=\\.tags"
 	path_def='./'
 	;;
 esac
