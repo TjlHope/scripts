@@ -1,0 +1,106 @@
+#!/usr/bin/env python
+import sys, re
+try:
+    from collections import defaultdict
+except ImportError:
+    class defaultdict(dict):
+        def __init__(self, factory):
+            self._factory = factory
+        def __getitem__(self, key):
+            try:
+                val = super(defaultdict, self).__getitem__(key)
+            except KeyError:
+                val = self._factory()
+                self[key] = val
+            return val
+
+
+def infiles(*filenames):
+    """Iterates through the lines of all the named files ('-' is stdin)."""
+    if not filenames: filenames = ('-',)
+    for name in filenames:
+        f = name == '-' and sys.stdin or open(name)
+        #try:
+        for line in f: yield line
+        #finally:
+        f.close()
+
+def get_next(iterator):
+    """Returns the 'next' method from the iterator."""
+    try: return iterator.__next__
+    except AttributeError: pass
+    try: return iterator.next
+    except AttributeError: pass
+    raise AttributeError("'%s' object has no 'next' or '__next__' attribute" %
+                         iterator)
+
+def cycle(iterable):
+    """Persistently cycles through the elements of the given iterable."""
+    while True:
+        for e in iterable: yield e
+
+# TODO get from terminfo instead
+_COLOURS = (
+    #'\x1b[30m',    #black          # not legible (dark)/default (light)
+    '\x1b[31m',     #red (dark)
+    '\x1b[32m',     #green (dark)
+    '\x1b[33m',     #yellow (brown)
+    #'\x1b[34m',     #blue (dark)    # barely legible (dark)
+    '\x1b[35m',     #magenta (dark)
+    '\x1b[36m',     #cyan (dark)
+    #'\x1b[37m',    #white (gray)   # default (dark)/not legible (light)
+    '\x1b[30;1m',   #black (bold gray)
+    '\x1b[31;1m',   #red (bold)
+    '\x1b[32;1m',   #green (bold)
+    '\x1b[33;1m',   #yellow (bold)  # barely legible (light)
+    '\x1b[34;1m',   #blue (bold)
+    '\x1b[35;1m',   #magenta (bold)
+    '\x1b[36;1m',   #cyan (bold)
+    #'\x1b[37;1m',  #white (bold)   # too similar to normal white
+)
+_RST = '\x1b[0m'
+
+def colourise(regex, input, output):
+    """Iterates through the input, writing to output.
+
+    If the regex matches a line of the input, the line is coloured (using ANSI
+    colour escape codes).
+    Equivalent matches (the last matched group of the regex, or the whole match
+    if there are no groups) are all coloured the same.
+    """
+    if isinstance(regex, str): regex = re.compile(regex)
+    # regex.groups is the number of groups in the regex, so by using this to
+    # index into match.group() we get the last matched group, or the whole
+    # match if no group is defined.
+    group_idx = regex.groups
+    keys = defaultdict(get_next(cycle(_COLOURS)))
+    try:
+        for line in input:
+            match = regex.search(line)
+            if match:
+                output.write(keys[match.group(group_idx)])
+                text = line.rstrip('\r\n')
+                output.write(text)
+                output.write(_RST)
+                output.write(line[len(text):])
+            else:
+                output.write(line)
+    except IOError:
+        if sys.exc_info()[1].errno == 32:   # broken pipe
+            return                          # just return silently
+        raise       # otherwise re-raise
+
+
+if __name__ == '__main__':
+    USAGE = "Usage: %s <ID regex> [file ...]\n"
+    l = len(sys.argv)
+    if len(sys.argv) <= 1:
+        sys.stderr.write(USAGE % sys.argv[0])
+        sys.exit(1)
+    elif sys.argv[1] == "-h" or sys.argv[1] == "--help":
+        sys.stdout.write(USAGE % sys.argv[0])
+        sys.exit(0)
+    try:
+        colourise(sys.argv[1], infiles(*sys.argv[2:]), sys.stdout)
+    except KeyboardInterrupt:
+        sys.exit(130)
