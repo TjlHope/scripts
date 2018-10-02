@@ -50,17 +50,17 @@ fmt_list() {    # [item1 [item2[ ...itemN]]]
 }
 
 
-unix_time() {   # date string
+date2unix() {   # date string
     date "+%s" -d "$*"
 }
-secs_time() {   # hh:mm:ss string
+hms2secs() {	# hh:mm:ss string
     local h m s IFS="$IFS:"
     read h m s <<- _EOF
 	$1
 	_EOF
     echo $(( $h * 3600 + $m * 60 + $s ))
 }
-hms_time() {    # seconds
+secs2hms() {    # seconds
     [ $1 -gt 0 ] || {
         echo "0 seconds"
         return
@@ -82,16 +82,16 @@ do
     do
         case "$action" in
             BLANK|LOCK)
-                blanked=$(unix_time "$time")
-                timeout=$(secs_time "$(get_timeout)")
+                blanked=$(date2unix "$time")
+                timeout=$(hms2secs "$(get_timeout)")
                 idle=$(( $blanked - $timeout ))
                 [ $idle -lt ${woken-0} ] && idle=$woken # in case it was forced
                 unset blanked timeout;;
             UNBLANK)
-                woken=$(unix_time "$time")
+                woken=$(date2unix "$time")
                 [ -n "$idle" ] && {
                     duration=$(( $woken - $idle ))
-                    show "Idle for $(hms_time $duration)" \
+                    show "Idle for $(secs2hms $duration)" \
                         "$(def_time @$idle) -> $(def_time @$woken)"
                     unset idle duration
                 };;
