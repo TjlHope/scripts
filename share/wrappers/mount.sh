@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=1090
 # SCRIPTS_DIR/share/wrappers/mount.sh
 
 # source library scripts 
@@ -56,10 +57,11 @@ case "${0##*/}" in
 	esac
         mount_dir="$1"
 	# if none specified and only one - use that
-	[ -z "$mount_dir" ] && [ $(ls -d /media/cd-* 2>/dev/null | wc -l) -eq 1 ] &&
+	[ -z "$mount_dir" ] &&
+	    [ "$(ls -d /media/cd-* 2>/dev/null | wc -l)" -eq 1 ] &&
 	    mount_dir="$(ls -d /media/cd-*)"
 	# check it exists
-	[ -d "$mount_dir" ] || die "Invalid mount point: $mound_dir"
+	[ -d "$mount_dir" ] || die "Invalid mount point: $mount_dir"
 	# check if mounted
 	grep -q "/dev/loop[0-9][ 	]${mount_dir%/}" </proc/mounts ||
 	    die "Not mounted: $mount_dir"
