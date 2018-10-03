@@ -1,0 +1,180 @@
+#!/bin/sh
+# shellcheck disable=2039
+# vi: sw=4 et
+
+set -e
+
+_IFS="$IFS"
+NL="
+"
+IFS="$NL"
+true && true=$?
+false || false=$?
+
+eoo_get_object_streams() {
+    local file="$1"
+    oledump "$file" | sed -Ene 's/^ ?([a-zA-Z]*[0-9]+): O[ 	]+.*$/\1/p' ||
+        eoo_sanitise_oledump_return
+}
+
+eoo_list_object_streams() {
+    local file="$1" stream="" name=""
+    for stream in $(eoo_get_object_streams "$file")
+    do
+        name="$(oledump "$file" -s "$stream" -i | sed -Ene '
+            /^String/ {
+                s/^String [0-9]+:[ 	]*(.*)/\1/p
+                q
+            }')"
+    printf '%s:\t%s\n' "$stream" "${name%[$_IFS]}"
+    done
+}
+
+eoo_extract_object() {
+    local file="$1" stream="$2"
+    oledump "$file" -s "$stream" -e ||
+        eoo_sanitise_oledump_return
+}
+
+eoo_sanitise_oledump_return() {
+    local ret=$?
+    case "$ret" in (0|1|2) return $true;; esac
+    return $ret;
+}
+
+if command -v oledump >/dev/null
+then :
+elif command -v oledump.py >/dev/null
+then oledump() { oledump.py "$@"; }
+else oledump() { false; }
+fi
+
+if ! oledump --help >/dev/null 2>&1
+then
+    cat >&2 <<_EOF
+Cannot find and execute oledump.py
+
+It's available from https://github.com/DidierStevens/DidierStevensSuite/blob/master/oledump.py
+
+Ensure it's in your PATH, that's it's executable, and that it's using python 2
+as the interpreter.
+_EOF
+    exit 1
+fi
+
+usage() {
+    local ret=$? nohelp=true
+    [ "${1-}" != "--help" ] || { nohelp=false; shift; }
+    [ $# -eq 0 ] || [ $ret -ne 0 ] || ret=1
+    [ $ret -eq 0 ] || exec >&2
+    [ $# -eq 0 ] || echo "$*"
+    cat <<_EOF
+Usage: $0 <OFFICE_FILE> [-fin] [[--] <ID or NAME>[ <ID or NAME>[ ...]]]
+       $0 <OFFICE_FILE> [-l]
+       $0 <OFFICE_FILE> [-h]
+_EOF
+    "$nohelp" || cat <<_EOF
+
+With no extra arguments, extracts all object streams from OFFICE_FILE to the
+current directory with their original file names. Extra arguments list the
+stream ID or file name to extract.
+
+Options:
+ -f, --force            overwrite existing files without asking.
+ -i, --interactive      ask before overwriting existing files.
+ -n, --no-clobber       do not overwrite existing files.
+ -l, --list     list the available object stream IDs and file names.
+ -h, --help     display this help message.
+
+_EOF
+    exit $ret
+}
+
+is_set() {
+    eval "[ \"\${$1-unset}\${$1+set}\" != unset ]"
+}
+
+should_overwrite() {
+    case "$overwrite" in
+        true)       return $true;;
+        false)      return $false;;
+        *)  local file="$1" response=''
+            while true
+            do
+                printf 'File already exists: %s\n' "$file"
+                printf 'Overwrite? [y]es, [n]o, [A]ll, [N]one: '
+                read -r response
+                case "$response" in
+                    y|yes)      return $true;;
+                    n|no)       return $false;;
+                    A|All)      overwrite=true; return $true;;
+                    N|None)     overwrite=false; return $false;;
+                esac
+            done;;
+    esac
+}
+
+[ $# -gt 0 ] || usage
+overwrite=ask
+list=false
+unset file
+while [ $# -gt 0 ]
+do  
+    case "$1" in
+        -f|--force)             overwrite=true;;
+        -i|--interactive)       overwrite=ask;;
+        -n|--no-clobber)        overwrite=false;;
+        -l|--list)
+            list=true
+            if is_set file; then
+                eoo_list_object_streams "$file"
+                exit
+            fi;;
+        -h|--help)
+            usage --help;;
+        --)
+            shift; break;;
+        *)
+            if ! is_set file; then
+                file="$1"
+                if "$list"; then
+                    eoo_list_object_streams "$file"
+                    exit
+                fi
+            else
+                break
+            fi;;
+    esac
+    shift
+done
+
+is_set file || usage
+[ -f "$file" ] || usage "Error: not a file:" "$file"
+
+if [ $# -gt 0 ]
+then
+    all_streams="$(eoo_list_object_streams)"
+    streams=""
+    while [ $# -gt 0 ]
+    do
+        stream="$(echo "$all_streams" | grep -F "$1")" || {
+            echo "Warning: unknown stream: $1" >&2
+            continue
+        }
+        streams="$streams$NL$stream"
+        shift
+    done
+else
+    streams="$(eoo_list_object_streams "$file")"
+fi
+
+for stream in $streams
+do
+    stream_id="${stream%:*}"
+    output="${stream#$stream_id:	}"
+    if [ ! -f "$output" ] || should_overwrite "$output"
+    then
+        eoo_extract_object "$file" "$stream_id" > "$output"
+    fi
+done
+
