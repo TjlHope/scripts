@@ -3,7 +3,6 @@
 
 # I also use this repo as /usr/local, so ignore these as well
 /lib32
-/lib64
 /portage
 /share/backgrounds
 /share/slim
