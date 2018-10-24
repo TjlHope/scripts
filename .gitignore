@@ -4,5 +4,7 @@
 # I also use this repo as /usr/local, so ignore these as well
 /lib32
 /portage
+/crossdev
 /share/backgrounds
 /share/slim
+/lib*/ruby
