@@ -78,11 +78,13 @@ def colourise(regex, input, output):
         for line in input:
             match = regex.search(line)
             if match:
-                output.write(keys[match.group(group_idx)])
-                text = line.rstrip('\r\n')
+                start, end = match.span(group_idx)
+                output.write(line[:start])
+                text = line[start:end]
+                output.write(keys[text])
                 output.write(text)
                 output.write(_RST)
-                output.write(line[len(text):])
+                output.write(line[end:])
             else:
                 output.write(line)
     except IOError:
