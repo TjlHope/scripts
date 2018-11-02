@@ -1,0 +1,359 @@
+#!/usr/bin/env python3
+# TODO: re-implement using sre_parse.parse
+
+import sys
+import codecs
+import logging
+logging.basicConfig(level=logging.DEBUG)
+NAME = 'git-hg-xignore' if __name__ == '__main__' else __name__
+log = logging.getLogger(NAME)
+
+def hg2git(hg_iter):
+    syntax = 'regexp'
+    for line in hg_iter:
+        bare = line.lstrip()
+        if not bare or bare.startswith('#'):
+            yield line
+        elif bare.startswith('syntax:'):
+            syntax = bare[len('syntax:'):].strip()
+        else:
+            if syntax == 'regexp':
+                try:
+                    yield re2glob(line)
+                except ValueError as e:
+                    return '# invalid regexp ({}): {}'.format(e, re)
+                except StopIteration as e:
+                    return ('# unexpected end of regexp '
+                            '(unterminated group?): {}').format(re)
+                except Exception as e:
+                    log.warning('Error transforming regexp: %s', re, exc_info=True)
+            elif syntax == 'glob':
+                yield line
+            else:
+                yield '# unknown syntax: {}; ignoring: {}'.format(syntax, line)
+
+def re2glob(line):
+    if not line: return line
+    re = line.rstrip('\r\n')
+    if not re: return line
+    sep = line[len(re):]
+    chars, res = iter(re), GroupResult()
+    char_set = False
+    for c in chars:
+        if char_set:    # nearly all chars are literal in a char set
+            res += c
+            if c == ']':
+                char_set = False
+                res = res.close()
+        elif c == '[':
+            char_set = True
+            n = next(chars)
+            negated = n == '^'
+            res = res.open(negated)
+            res += c + ('!' if negated else n)
+        elif c == '(':
+            res = res.open()
+        elif c == '|':
+            res = res.next()
+        elif c == ')':
+            res = res.close()
+        elif c == '\\':
+            n = next(chars)
+            if n in {'n','r','*','?','['}:
+                res += c + n
+            else:
+                res += n
+        elif c == '^':
+            if res.is_top_level() and not res.value:
+                res += '/'
+            else:
+                res += c
+        elif c == '$':
+            # TODO means we skip the '|'...
+            if res.is_top_level() and next(chars, '|') == '|':
+                if not res.startswith('/'):
+                    res.prepend('**/' if '/' in res else '*')
+            else:
+                res += c
+        elif c == '.':
+            res += '?'
+        elif c in {'*','?'}:
+            # TODO these should be checking what's cleared
+            rep = '**' if res._pre_under('/') else '*'
+            res = res.clear(1).append_ro(rep)
+        elif c == '+':
+            rep = '**' if res._pre_under('/') else '*'
+            res = res.append_ro(rep)
+        elif c == '{':
+            n = next(chars)
+            if n == '}':
+                raise ValueError('no repeat group count')
+            rep = '**' if res._pre_under('/') else '*'
+            if n in {'0',','}:
+                res.clear(1)
+            while n != '}':
+                if n not in {'0','1','2','3','4','5','6','7','8','9',','}:
+                    raise ValueError('invalid repeat group char: ' + n)
+                next(chars, '')
+            res = res.append_ro(rep)
+        else:
+            res += c
+    if not res.is_top_level():
+        raise StopIteration()
+    return sep.join(res.root().strs()) + sep   # TODO optimise
+
+# Group Result tree structure
+#
+# Given: P1(P2|P3(P4))P5|P6
+# Parent links are set up as:
+#  root <-------------------.-----.
+#   ^\                       \  |  \ 
+#   P1 <-.------.            P5    P6
+#      (  \  |   \         )
+#         P2     P3 <.       
+#                  (  \ )
+#                    P4  
+# Trail links are set up as:
+#  root --------------------------.
+#   `v                          | `v
+#   P1 --.------.                  P6
+#      ( `v  |  `v
+#         P2     P3 -.       
+#          \       ( `v
+#           \        P4  
+#            \        \ )
+#             \        \   )
+#              `--------`--> P5
+#
+# This means the parent links show how deep (or not) a node is in the
+# structure, whilst the trail links allow traversal of all string parts in
+# order.
+# There is also a head link from P5 to P1 to link it to the first node at the
+# same level
+class GroupResult(object):
+    def __init__(self, value='',
+                 parent=None, head=None, trails=None,
+                 ro=False, negated=False):
+        if parent is None:
+            if trails is None:
+                parent = GroupResult(trails=[self])
+        self.parent = parent
+        self._head = head
+        self._trails = trails or []
+        self.ro = False
+        self.value = value
+        self.ro = ro
+        self.negated = negated
+
+    @property
+    def value(self):
+        return self._value
+    @value.setter
+    def value(self, value):
+        self._check_ro()
+        self._value = value
+
+    @property
+    def head(self):
+        return self if self._head is None else self._head.head
+
+    def _check_ro(self):
+        if self.ro:
+            raise ValueError('cannot modify: ' + self.value)
+        return self
+
+    def open(self, negated=False):
+        self._check_ro()
+        node = GroupResult(parent=self, negated=negated)
+        self._trails.append(node)
+        return node
+    def next(self):
+        self._check_ro()
+        return self.parent.open()
+    def close(self, ro=False):
+        if self.is_top_level():
+            raise ValueError('cannot close an unopened group')
+        # The new node is closing our group, so it is at the same level as our
+        # parent, meaning its parent must be our parents parent.
+        grandparent = self.parent.parent
+        if grandparent is None:
+            TypeError('non top-level node has no grandparent')
+        node = GroupResult(parent=grandparent, head=self.parent,
+                           negated=self.parent.negated)
+        for sibling in self.parent._trails:
+            if ro: sibling.ro = True
+            sibling._trails.append(node)
+        return node
+
+    def append(self, value):
+        self.value += value
+        return self
+    def __iadd__(self, value):
+        return self.append(value)
+    def __add__(self, value):
+        return self.append(value)
+
+    def append_ro(self, value):
+        return self.open().append(value).close(ro=True)
+
+    def prepend(self, value):
+        head = self.head
+        head.value = value + head.value
+        return self
+    def __radd__(self, value):
+        return self.prepend(value)
+
+    def clear(self, count=1):
+        self._check_ro()
+        if count < 1: return self
+        if self.value:  # we have a string value, clear chars
+            self.value = self.value[:-1]    # TODO optimise
+            return self.clear(count - 1)
+        # otherwise we have to replace the whole preceding group...
+        if self.head is self:
+            raise ValueError('no group or char to clear')
+        for trail in self.head._trails:
+            trail._check_ro()
+        self.head._trails = self._trails
+        return self.head.clear(count - 1)
+
+    # TODO: finish off...
+    def _TODO_clear(self, count=1):
+        self._check_ro()
+        if count < 1: return GroupResult('')
+        # Set things up: res and trail are both self.
+        res, tail = self, self
+        # But then count needs to reflect self's value.
+        count -= len(res.value)
+        while count > 0:
+            res = res._head
+            if res is None:
+                raise ValueError('no group or char to clear')
+            count -= 1  # for the intervening group     # TODO counts?
+            count -= len(res.value)
+        # So now res -> tail includes at least count chars/groups.
+        # Next we need to split res to put a new node before it.
+        # At this point count is either 0, indicating that the whole of res
+        # needs to be cleared, or it is negative, indicating that res has that
+        # There may be other nodes that reference res in their _trails, and as
+        # their _head.
+        # many chars that do not need to be cleared from it.
+        # e.g. new node value: 'test'[:-0] == ''     or 'test'[:--2] == 'te'
+        #           res value: 'test'[-0:] == 'test' or 'test'[--2:] == 'st'
+        node_value = res.value[:-count]
+        res.value = res.value[-count:]
+        node = GroupResult(node_value, parent=res.parent,
+                           res=res._head, trails=tail._trails)
+        node._trails = [n]
+        while node is not None:
+            node._check_ro()
+            if node.value:
+                if count < len(node.value):
+                    # split the current node, with a new tail node containing
+                    # the value to clear
+                    res_head = n
+                    count = 0
+                else:
+                    res_head = node
+                    count -= len(node.value)
+            if count < 1: break
+            if node._head is not None:
+
+                count -= 1
+
+        
+            node = node._head
+        else:
+            raise ValueError('no group or char to clear')
+
+
+    def __bool__(self):
+        for node in self.head:
+            if node.value:
+                return True
+        return False
+
+    def __contains__(self, value):
+        for node in self.head:
+            if node.negated ^ (value in node.value):
+                return True
+        return False
+
+    # TODO this is a hack...
+    def _pre_under(self, value):
+        if self._head is None: return False
+        itr = self._head.__iter__(_visited={self})
+        next(itr)   # skip _head
+        for node in itr:
+            if node.negated ^ (value in node.value):
+                return True
+        return False
+
+    def startswith(self, value):
+        return self.head.value.startswith(value)
+    def endswith(self, value):
+        # TODO: tail link to traverse?
+        return self.value.endswith(value)
+
+    def is_top_level(self):
+        p = self.parent
+        return p is None or (p.parent is None and not p.value)
+
+    def root(self):
+        return self if self.parent is None else self.parent.root()
+
+    def __iter__(self, _visited=None):
+        if _visited is None: _visited = set()
+        elif self in _visited: return
+        yield self
+        _visited.add(self)
+        for tail in self._trails:
+            for node in tail.__iter__(_visited=_visited):
+                yield node
+
+    def strs(self):
+        if self._trails:
+            for node in self._trails:
+                for s in node.strs():
+                    yield self.value + s
+        else:
+            yield self.value
+
+    def __str__(self):
+        return '<{}@{:016x}{}({})'.format(
+            self.__class__.__name__, id(self),
+            (self.negated and '!' or ''), self.value)
+
+
+def main(argv):
+
+    def open_utf8(name, mode):
+        return codecs.open(name, mode, 'UTF-8')
+
+    USAGE =     'Usage: {name} -i\n'
+    USAGE +=    '       {name} <.hgignore|-> <.gitignore|->\n'
+    name = argv[0]
+    argv = argv[1:]
+    argc = len(argv)
+
+    if not argv or '-h' in argv or '--help' in argv:
+        sys.stdout.write(USAGE.format(name=name))
+        return 0
+    if argc == 1 and argv[0] == '-i':
+        hgignore = open_utf8('.hgignore', 'r')
+        gitignore = open_utf8('.gitignore', 'w')
+    elif argc == 2:
+        hgignore = sys.stdin if argv[0] == '-' else open_utf8(argv[0], 'r')
+        gitignore = sys.stdout if argv[1] == '-' else open_utf8(argv[1], 'w')
+    else:
+        sys.stderr.write(USAGE.format(name=name))
+        return 1
+
+    modified = hg2git(hgignore)
+    gitignore.writelines(modified)
+    gitignore.writelines(['\n', '.gitignore\n'])
+
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))
