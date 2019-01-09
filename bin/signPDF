@@ -116,7 +116,8 @@ cd "$tmp_d"
 
 echo "-------------- Extracting page from pdf   -----------------"
 pdftk "$file" cat "$page" output "to_sign.pdf"
-convert -density 100 "to_sign.pdf" "to_sign.png"
+convert -density 100 "to_sign.pdf" \
+    PNG32:"to_sign.png"
 
 
 echo "-------------- !!! Click on two points defining the signature box -----------------"
@@ -170,14 +171,22 @@ echo "--------------                      fitting within      : ${dx}x${dy}"
 # Resize the signature,
 # ... and get a clear background
 convert "to_sign.png" \
+    -set colorspace sRGB -strip \
     -fill White -colorize 100% -alpha Transparent \
-    "bg.png"
+    PNG32:"bg.png"
+convert "$sig" \
+    -set colorspace sRGB -strip \
+    PNG32:"sig.png"
 # ... to compose with the signature,
 composite -geometry "${dx}x${dy}+${x1}+${y}" \
-    "$sig" "bg.png" \
-    "sig+bg.png"
+    -colorspace sRGB -strip \
+    "sig.png" "bg.png" \
+    PNG32:"sig+bg.png"
+file "sig+bg.png"
 # ... then convert back to a pdf,
-convert -density 100 "sig+bg.png" "sig+bg.pdf"
+convert -density 100 PNG32:"sig+bg.png" \
+    -set colorspace sRGB -strip \
+    "sig+bg.pdf"
 # ... so that pdftk can use it as a stamp
 pdftk "to_sign.pdf" stamp "sig+bg.pdf" output "signed.pdf"
 
