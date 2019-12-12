@@ -21,12 +21,14 @@ def hg2git(hg_iter):
                 try:
                     yield re2glob(line)
                 except ValueError as e:
-                    return '# invalid regexp ({}): {}'.format(e, re)
+                    yield '# invalid regexp ({}): {}'.format(e, line)
                 except StopIteration as e:
-                    return ('# unexpected end of regexp '
-                            '(unterminated group?): {}').format(re)
+                    yield ('# unexpected end of regexp '
+                            '(unterminated group?): {}').format(line)
                 except Exception as e:
-                    log.warning('Error transforming regexp: %s', re, exc_info=True)
+                    log.warning('Error transforming regexp: %s', line, exc_info=True)
+                    yield ('# unknown error transforming regexp ({}): '
+                           '{}').format(e, line)
             elif syntax == 'glob':
                 yield line
             else:
@@ -34,10 +36,10 @@ def hg2git(hg_iter):
 
 def re2glob(line):
     if not line: return line
-    re = line.rstrip('\r\n')
-    if not re: return line
-    sep = line[len(re):]
-    chars, res = iter(re), GroupResult()
+    rx = line.rstrip('\r\n')
+    if not rx: return line
+    sep = line[len(rx):]
+    chars, res = iter(rx), GroupResult()
     char_set = False
     for c in chars:
         if char_set:    # nearly all chars are literal in a char set
