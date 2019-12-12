@@ -17,9 +17,9 @@ static int usage(char* name) {
 int main(int argc, char* argv[]) {
     // Optionally print uage and exit
     if (argc > 1) {
-        if (    strcmp(argv[1], "-h") ||
-                strcmp(argv[1], "-?") ||
-                strcmp(argv[1], "--help")) {
+        if (    !strcmp(argv[1], "-h") ||
+                !strcmp(argv[1], "-?") ||
+                !strcmp(argv[1], "--help")) {
             usage(argv[0]);
             return 0;
         }
@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
     // Keep using getpwent() to output users
     static struct passwd* entry;
     setpwent();
-    while (entry = getpwent()) {
+    while ((entry = getpwent())) {
         printf("%s\n", entry->pw_name);
     }
     endpwent();

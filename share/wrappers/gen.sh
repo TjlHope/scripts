@@ -1,5 +1,5 @@
 #!/bin/sh
-# SCRIPTS_DIR/share/wrappers/find.sh
+# SCRIPTS_DIR/share/wrappers/gen.sh
 
 [ -h "$0" ] && this="$(readlink -f "$0")" || this="$0"
 name="${0##*/}"
@@ -7,6 +7,7 @@ lib_d="${this%/*/*/*}/lib"
 src_d="${this%/*/*}/src"
 gen_d="$src_d/gen"
 
+# shellcheck source=SCRIPTDIR/../../lib/output.sh
 . "$lib_d/output.sh"
 
 # Parse wrapper arguments
@@ -35,6 +36,7 @@ do
 		
 		_EOF
             break;;
+        *)  break;;
     esac
     shift
 done
@@ -54,15 +56,17 @@ done
 [ -f "$src_f" ] || die "Cannot find source file: $src_f"
 
 gen_f="$gen_d/$name"    # Generate if necessary
+# shellcheck disable=2039 # it's supported in dash & busybox
 if $force || [ ! -x "$gen_f" ] || [ "$src_f" -nt "$gen_f" ]
 then
     info "Generating: $gen_f"
     info "      from: $src_f"
     [ -d "$gen_d" ] || mkdir "$gen_d"   # no -p as $src_d must exist here
+    # get any arguments from the source file to pass to the comiper a la vi:
     args="$(sed -ne '1,5{s/^.*gen\.sh\s*:\s*\([^:]*\):\?\s*$/\1/p}' "$src_f")"
     case "$src_f" in            # let's try and be polite about size
-        *.c)            gcc -Os -s "$src_f" -o "$gen_f" $args;;
-        *.c[px][px])    g++ -Os -s "$src_f" -o "$gen_f" $args;;
+        *.c)            eval "gcc -Os -s \"\$src_f\" -o \"\$gen_f\" $args";;
+        *.c[px][px])    eval "g++ -Os -s \"\$src_f\" -o \"\$gen_f\" $args";;
         *)              die "Don't know how to generate from: $src_f";;
     esac || die "Failed to generate from: $src_f"
 fi
