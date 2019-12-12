@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+
+import sys, os
+
+MAPPING = dict(zip(
+    (
+        list(range(ord('a'), ord('z') + 1)) +
+        list(range(ord('A'), ord('Z') + 1)) +
+        list(range(ord('0'), ord('9') + 1)) +
+        [ord('*'), ord('#')]
+    ),
+    (
+        (           '2'*3 + '3'*3 +
+            '4'*3 + '5'*3 + '6'*3 +
+            '7'*4 + '8'*3 + '9'*4
+        ) * 2 +
+        '0123456789' +
+        '*#'
+    ),
+))
+SPACE = os.environ.get("A2T_SPACE", '0')
+OTHER = os.environ.get("A2T_OTHER", '1')
+
+def a2t(text, space=SPACE, other=OTHER):
+    from unicodedata import normalize
+    text_bytes = normalize('NFKD', text).lower().encode('ascii', 'ignore')
+    return ''.join((_a2t(b, space, other) for b in text_bytes))
+
+def _a2t(c, space=SPACE, other=OTHER):
+    d = MAPPING.get(c)
+    if d: return d
+    if chr(c).isspace(): return space
+    return other
+
+if __name__ == '__main__':
+    argv = sys.argv[1:]
+    if not argv:
+        lines = (l.rstrip('\r\n') for l in sys.stdin)
+    elif argv[0] == '--':
+        lines = [' '.join(argv[1:])]
+    elif '--help' in argv or '-h' in argv:
+        sys.stderr.writelines(
+            'Usage: ', sys.argv[0], '[--] [text to convert]\n',
+            '\n',
+            'Convert text to equivalent keys from a telephone keypad\n',
+        )
+        sys.exit()
+    else:
+        lines = [' '.join(argv)]
+    sys.stdout.writelines((a2t(l) + '\n' for l in lines))
