@@ -1,0 +1,3 @@
+#!/bin/sh
+# taken from https://stackoverflow.com/a/9766506
+git mktree </dev/null
