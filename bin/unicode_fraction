@@ -1,0 +1,135 @@
+#!/bin/sh
+# vi: sw=4 sts=4 ts=8 et
+# shellcheck disable=2034 # FRAC_N_D is grabbed using eval
+set -eu
+[ -z "${SH_OPTS-}" ] || set -"${SH_OPTS#-}"
+
+
+superscript() {
+    echo "$*" | sed -e '
+        s:0:⁰:g
+        s:1:¹:g
+        s:2:²:g
+        s:3:³:g
+        s:4:⁴:g
+        s:5:⁵:g
+        s:6:⁶:g
+        s:7:⁷:g
+        s:8:⁸:g
+        s:9:⁹:g
+        s:+:⁺:g
+        s:-:⁻:g
+        s:=:⁼:g
+        s:(:⁽:g
+        s:):⁾:g
+        s:a:ᵃ:g
+        s:b:ᵇ:g
+        s:c:ᶜ:g
+        s:d:ᵈ:g
+        s:e:ᵉ:g
+        s:f:ᶠ:g
+        s:g:ᵍ:g
+        s:h:ʰ:g
+        s:i:ⁱ:g
+        s:j:ʲ:g
+        s:k:ᵏ:g
+        s:l:ˡ:g
+        s:m:ᵐ:g
+        s:n:ⁿ:g
+        s:o:ᵒ:g
+        s:p:ᵖ:g
+        s:r:ʳ:g
+        s:s:ˢ:g
+        s:t:ᵗ:g
+        s:u:ᵘ:g
+        s:v:ᵛ:g
+        s:w:ʷ:g
+        s:x:ˣ:g
+        s:y:ʸ:g
+        s:z:ᶻ:g
+    '
+}
+
+subscript() {
+    echo "$*" | sed -e'
+        s:0:₀:g
+        s:1:₁:g
+        s:2:₂:g
+        s:3:₃:g
+        s:4:₄:g
+        s:5:₅:g
+        s:6:₆:g
+        s:7:₇:g
+        s:8:₈:g
+        s:9:₉:g
+        s:+:₊:g
+        s:-:₋:g
+        s:=:₌:g
+        s:(:₍:g
+        s:):₎:g
+        s:a:ₐ:g
+        s:e:ₑ:g
+        s:h:ₕ:g
+        s:i:ᵢ:g
+        s:j:ⱼ:g
+        s:k:ₖ:g
+        s:l:ₗ:g
+        s:m:ₘ:g
+        s:n:ₙ:g
+        s:o:ₒ:g
+        s:p:ₚ:g
+        s:r:ᵣ:g
+        s:s:ₛ:g
+        s:t:ₜ:g
+        s:u:ᵤ:g
+        s:v:ᵥ:g
+        s:x:ₓ:g
+    '
+}
+
+known_fraction() {
+    # shellcheck disable=2039
+    local frac=''
+    frac="$(echo "$*" | sed -ne'
+        s:^1/2$:½:p;t
+        s:^1/3$:⅓:p;t
+        s:^2/3$:⅔:p;t
+        s:^1/4$:¼:p;t
+        s:^3/4$:¾:p;t
+        s:^1/5$:⅕:p;t
+        s:^2/5$:⅖:p;t
+        s:^3/5$:⅗:p;t
+        s:^4/5$:⅘:p;t
+        s:^1/6$:⅙:p;t
+        s:^5/6$:⅚:p;t
+        s:^1/7$:⅐:p;t
+        s:^1/8$:⅛:p;t
+        s:^3/8$:⅜:p;t
+        s:^5/8$:⅝:p;t
+        s:^7/8$:⅞:p;t
+        s:^1/9$:⅑:p;t
+        s:^1/10$:⅒:p;t
+    ')"
+    [ -n "$frac" ] && echo "$frac"
+}
+
+msg() { printf '%s\n' "$@"; }
+err() {
+    # shellcheck disable=2039
+    local s=$?; [ $s -gt 0 ] || s=1
+    [ $# -lt 1 ] || msg "$@" >&2
+    return $s
+}
+die() { err "$@" || exit; }
+
+unicode_fraction() {
+    [ $# -eq 1 ] && case "$1" in */*):;; *)false;; esac ||
+        err "Usage: unicode_fraction <numberator/denominator>" || return
+    known_fraction "$1" ||
+        echo "$(superscript "${1%%/*}")/$(subscript "${1#*/}")"
+}
+
+if [ "$(basename "$0" .sh)" = unicode_fraction ]
+then
+    unicode_fraction "$@"
+fi
