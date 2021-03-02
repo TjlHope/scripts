@@ -2,6 +2,8 @@
 # git-hg-diff
 #       replaces the hashes in the given (or generated) git diff with their
 #       mercurial counterparts.
+set -eu
+[ -z "${SH_OPTS-}" ] || set -"${SH_OPTS#-}"
 
 git notes --ref=refs/notes/hg >/dev/null 2>&1 || {
     echo "Error: Couldn't find notes reference 'refs/notes/hg'," >&2
@@ -10,23 +12,25 @@ git notes --ref=refs/notes/hg >/dev/null 2>&1 || {
 }
 
 split() {       # returns by updating vars 'first' and 'rest'
+    # shellcheck disable=2039
     local str="$1" chr="${2-$IFS}" def_first="$3" def_rest="${4-$3}"
     first="${str%%[$chr]*}" rest="${str#*$chr}"
     [ "$rest" = "$str" ] && rest=""
-    : ${first:=$def_first} ${rest:=$def_rest}
+    : "${first:=$def_first}" "${rest:=$def_rest}"
 }
 
 # Process arguments in a function so we can play around with shift
 # and set -- as much as we like
 process_git_diff_args() {
+    # shellcheck disable=2039
     local first rest            # split return vars
     unset stdin from to         # we set these as return values
     while [ $# -gt 0 ]
     do
         case "$1" in
-            -?*|--?*)   :;;                     # argument, so ignore it
             --)         break;;                 # only files left, we're done
             -)          stdin=true;;            # the diff's being piped in
+            -[!-]*|--?*)   :;;                  # argument, so ignore it
             # do *...* first as *..* would match it as well
             *...*)      split "$1" ... HEAD     # base commit range
                 from="$(git merge-base "$first" "$rest")" to="$rest"
@@ -35,36 +39,37 @@ process_git_diff_args() {
                 from="$first" to="$rest"
                 break;;                         # got from and to, we're done
             *)                                  # single commit
-                if [ -z "$from" ]; then from="$1"
-                elif [ -z "$to" ]; then to="$1"
+                if [ -z "${from-}" ]; then from="$1"
+                elif [ -z "${to-}" ]; then to="$1"
                 else break                      # got from and to, we're done
                 fi;;
         esac
         shift
     done
     # return, setting defaults as necessary
-    : ${stdin=false} ${from=HEAD} ${to=}
+    : "${stdin=false}" "${from=HEAD}" "${to=}"
 }
 process_git_diff_args "$@"
 
 hash_msg="Cannot determine mercurial hash for %s,"
 hash_msg="$hash_msg\\nenter manually [blank for branch tip]: "
 get_hg_rev() { # <git_hash>
+    # shellcheck disable=2039
     local git_hash="$1" hg_hash
     hg_hash="$(git notes --ref=refs/notes/hg show "$git_hash" 2>/dev/null || :)"
+    # shellcheck disable=2059
     [ -z "$hg_hash" ] && {
         printf "$hash_msg" "$git_hash" >&2
-	$stdin ||	# can't read it, so just assume HEAD
-	    read hg_hash
+	"$stdin" ||	# can't read it, so just assume HEAD
+	    read -r hg_hash
     }
-    [ -n "$hg_hash" ] && echo "$hg_hash" || :   # so it works with set -e
+    { [ -n "$hg_hash" ] && echo "$hg_hash"; } || :   # so it works with set -e
 }
 
 hg_from="$(get_hg_rev "$from")"
 [ -n "$to" ] && hg_to="$(get_hg_rev "$to")"
 
-{ $stdin &&
-    cat ||
+{ { $stdin && cat; } ||
     git diff --full-index "$@"
 } | sed -e "
     \:^diff --git a/\(.*\) b/\1$: {
