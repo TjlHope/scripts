@@ -1,0 +1,34 @@
+#!/bin/sh
+""":"
+# shell script to exec properly
+set -xe
+cqlsh="$(command -v cqlsh.py)" || {
+    cqlsh="$(command -v cqlsh)" && cqlsh="$(readlink -f "$cqlsh")"
+}
+export PYTHONPATH="$(dirname "$cqlsh")"
+exec python2 "$0" "$@"
+":"""
+from __future__ import with_statement
+import sys, os
+
+args = sys.argv[1:]
+if len(args) != 3 or '-h' in args or '--help' in args:
+    sys.stderr.write('Usage: ' + sys.argv[0] +
+                     ' <KEYSPACE> <TABLE> <COLUMN>\n')
+    sys.exit(2)
+
+host = os.environ.get('CQLSH_HOST') or 'localhost'
+port = int(os.environ.get('CQLSH_PORT') or 9042)
+keyspace, table, column = args
+
+from cqlsh import Cluster
+conn = Cluster(contact_points=(host,), port=port)
+
+with conn.connect() as session:
+    has_column = (column in
+                  conn.metadata.keyspaces[keyspace].tables[table].columns)
+
+if has_column:
+    sys.exit(0)
+else:
+    sys.exit(1)
