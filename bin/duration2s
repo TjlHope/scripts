@@ -1,0 +1,60 @@
+#!/bin/sh
+# vi: sw=4 sts=4 ts=8 et
+set -eu
+[ -z "${SH_OPTS-}" ] || set -"${SH_OPTS#-}"
+_IFS="$(printf ' \t\n#')"; _IFS="${_IFS%#}"
+
+# TODO: librify all the below
+# shellcheck disable=2015
+msg() { [ $# -gt 0 ] && printf '%s\n' "$@" || :; }
+# shellcheck disable=2039
+err() { local s=$?; [ $s -gt 0 ] || s=1; msg "$@" >&2; return $s; }
+
+is_count() { [ "${1-}" -ge 0 ] 2>/dev/null; }
+char1() { printf '%.1s' "${1-}"; }
+
+is_duration() {
+    # shellcheck disable=2039
+    local IFS="$_IFS"
+    echo "$*" | grep -qEe \
+        '\s*([0-9]+w\s*)?([0-9]+d\s*)?([0-9]+h\s*)?([0-9]+m\s*)?([0-9]+s\s*)?'
+}
+
+duration2s() {
+    [ $# -gt 0 ] || err "Usage: duration <COUNT<w|d|h|m|s>>...|<SECS>" || return
+    if [ $# -eq 1 ] && is_count "$1"
+    then    # it's just been given as an integer, interpret as seconds
+        echo "$1"; return
+    fi
+    # Otherwise, iterate through, looking for $units in order
+    # shellcheck disable=2039
+    local IFS="$_IFS" units="wdhms" head="" tail="" secs=0 count=0 unit=""
+    # shellcheck disable=2048,2086
+    tail="$(printf '%s' $*)"  # join all the arguments together
+    while [ -n "$tail" ]
+    do
+        count="${tail%%[!0-9]*}"; tail="${tail#$count}"
+        is_count "$count" || err "Invalid count: $head*$count*$tail" || return
+        unit="$(char1 "$tail")"; tail="${tail#$unit}"
+        case "$unit" in
+            [$units])   units="${units#*$unit}";;
+            *)  err "Invalid unit $head$count*$unit*$tail" || return;;
+        esac
+
+        case "$unit" in
+            w)  secs=$((secs + count*60*60*24*7));;
+            d)  secs=$((secs + count*60*60*24));;
+            h)  secs=$((secs + count*60*60));;
+            m)  secs=$((secs + count*60));;
+            s)  secs=$((secs + count));;
+            *)  err "Invalid parsed unit: $head$count*$unit*$tail" || return;;
+        esac
+        head="$head$count$unit"
+    done
+    echo "$secs"
+}
+
+case "$(basename "$0" .sh)" in
+    is_duration)    is_duration "$@";;
+    duration2s)     duration2s "$@";;
+esac
