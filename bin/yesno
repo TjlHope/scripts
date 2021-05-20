@@ -1,0 +1,18 @@
+#!/bin/sh
+# vi: sw=2 sts=4 ts=8 et
+[ -z "${SH_OPTS-}" ] || set "-${SH_OPTS#-}"
+
+yesno() {
+  case "${1-}" in
+    [Yy]|[Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|1)   true;;
+    [Nn]|[Nn][Oo]|[Ff][Aa][Ll][Ss][Ee]|0)   false;;
+    "${2-}")        [ "${2+set}" = set ] || return 2;;
+    '')                                     return 2;;
+    *)                                      return 3;;
+  esac
+}
+yn() { yesno "$@"; }
+
+case "$(basename "$0" .sh)" in
+  yesno|yn) yesno "$@";;
+esac
