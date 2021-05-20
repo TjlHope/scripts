@@ -1,0 +1,48 @@
+#!/bin/sh
+# vi: sw=4 sts=4 ts=8 et
+[ -z "${SH_OPTS-}" ] || set -"${SH_OPTS#-}"
+
+# TODO: librify all the below
+# shellcheck disable=2015
+msg() { [ $# -gt 0 ] && printf '%s\n' "$@" || :; }
+# shellcheck disable=2039
+err() { local s=$?; [ $s -gt 0 ] || s=1; msg "$@" >&2; return $s; }
+
+varsubst() {
+    # shellcheck disable=2039
+    local a=""
+    for a in "$@"
+    do  case "$a" in
+        -h|--help)
+            # shellcheck disable=2016
+            msg 'Usage: varsubst VAR=VALUE...' \
+                '' \
+                'Pipes stdin to stdout, replacing all $VAR/${VAR} with VALUE.'
+            return;;
+        *=*):;;
+        *)  err "Invalid VAR=VALUE: $a" || return;;
+        esac
+    done
+    # shellcheck disable=2016
+    env -i "$@" awk '
+    BEGIN { FS = "\n"; }
+    {
+        line = $0
+        while (match(line, /\$\{[_a-zA-Z][_a-zA-Z0-9]*\}|\$[_a-zA-Z][_a-zA-Z0-9]*/)) {
+            head = substr(line, 1, RSTART - 1)
+            if (substr(line, RSTART + 1, 1) == "{") {
+                var = substr(line, RSTART + 2, RLENGTH - 3)
+            } else {
+                var = substr(line, RSTART + 1, RLENGTH - 1)
+            }
+            val = ENVIRON[var]
+            tail = substr(line, RSTART + RLENGTH)
+            line = head val tail
+        }
+        print line
+    }'
+}
+
+case "$(basename "$0" .sh)" in
+    varsubst)   varsubst "$@";;
+esac
