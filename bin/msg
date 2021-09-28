@@ -1,0 +1,24 @@
+#!/bin/sh
+# vi: sw=4 sts=4 ts=8 et
+
+msg() {
+    # shellcheck disable=2015
+    [ $# -gt 0 ] && printf '%s\n' "$@" || :
+}
+
+err() {
+    # shellcheck disable=2039
+    local s=$?
+    [ $s -gt 0 ] || s=1
+    msg "$@" >&2
+    return $s
+}
+
+die() {
+    err "$@" || exit
+}
+
+__msg_name="$(basename "$0" .sh)"
+case "$__msg_name" in
+    msg|err|die)    "$__msg_name" "$@";;
+esac

@@ -1,0 +1,27 @@
+#!/bin/sh
+# vi: sw=4 sts=4 ts=8 et
+[ -z "${SH_OPTS-}" ] || set -"${SH_OPTS#-}"
+
+# TODO support using a local copy or something
+
+: "${CATEGORY:=British+English}"
+
+. percent_decode
+
+random_word() {
+    # shellcheck disable=2039
+    local loc=""
+    loc="$(curl -s -w '%{redirect_url}' \
+            "https://en.wiktionary.org/wiki/Special:RandomInCategory" \
+            -d "wpcategory=$CATEGORY")" &&
+        loc="${loc##*[?&]title=}" && loc="${loc%%&*}" || return
+    case "$loc" in
+        "Category:"*)   random_word "$@";;  # try again
+        *)              echo "$loc" | percent_decode |
+                            tr '_' ' '   # seems to use '_' for spaces
+    esac
+}
+
+case "$(basename "$0" .sh)" in
+    random_word)    random_word "$@";;
+esac

@@ -1,0 +1,32 @@
+#!/bin/sh
+# vi: sw=4 sts=4 ts=8 et
+[ -z "${SH_OPTS-}" ] || set -"${SH_OPTS#-}"
+
+# TODO: better lib detection
+. msg
+
+percent_decode() {
+    [ $# -eq 0 ] || err "Usage: percent_decode (stdin to stdout)" || return
+    # Trick from https://stackoverflow.com/a/32437561 - might not be portable?
+    awk -Wposix 2>/dev/null '
+    BEGIN { FS = "\n"; }
+    {
+        line = $0
+        while (match(line, /%[0-9A-Za-z]{2}|\+/)) {
+            head = substr(line, 1, RSTART - 1)
+            if (RLENGTH == 1) {
+                val = " "
+            } else {
+                hex = "0x" substr(line, RSTART + 1, 2)
+                val = sprintf("%c", hex+0)
+            }
+            tail = substr(line, RSTART + RLENGTH)
+            line = head val tail
+        }
+        print line
+    }'
+}
+
+case "$(basename "$0" .sh)" in
+    percent[_-]decode)	percent_decode "$@";;
+esac
