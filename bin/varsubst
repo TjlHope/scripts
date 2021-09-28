@@ -2,11 +2,8 @@
 # vi: sw=4 sts=4 ts=8 et
 [ -z "${SH_OPTS-}" ] || set -"${SH_OPTS#-}"
 
-# TODO: librify all the below
-# shellcheck disable=2015
-msg() { [ $# -gt 0 ] && printf '%s\n' "$@" || :; }
-# shellcheck disable=2039
-err() { local s=$?; [ $s -gt 0 ] || s=1; msg "$@" >&2; return $s; }
+# TODO: better lib detection
+. msg
 
 varsubst() {
     # shellcheck disable=2039
