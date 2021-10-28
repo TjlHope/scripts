@@ -1,5 +1,10 @@
 #!/bin/sh
 # vi: sw=4 sts=4 ts=8 et
+#
+# Helper for message output
+#
+[ "${__sourced_msg-}" = msg ] && return ||
+  __sourced_msg=msg
 
 msg() {
     # shellcheck disable=2015
@@ -20,5 +25,6 @@ die() {
 
 __msg_name="$(basename "$0" .sh)"
 case "$__msg_name" in
-    msg|err|die)    "$__msg_name" "$@";;
+    msg|err)    "$__msg_name" "$@";;
+    # die only works as a function
 esac
