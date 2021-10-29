@@ -595,10 +595,11 @@ def parse(args):
     auth_group.add_argument("--psk", metavar="<psk>",
                             help="the Pre-shared key to use")
     auth_group.add_argument("--password", metavar="<passwd>",
-                            action="append",
+                            action="append", default=[],
                             help=("a password to use for EAP/XAuth "
                                   "(specify multiple in the expected order)"))
-    auth_group.add_argument("--pin", metavar="<pin>", action="append",
+    auth_group.add_argument("--pin", metavar="<pin>",
+                            action="append", default=[],
                             help=("a PIN to use for EAP/XAuth "
                                   "(specify multiple in the expected order)"))
     # TODO
