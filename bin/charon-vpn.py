@@ -14,7 +14,10 @@ import logging
 import argparse
 import re
 import shlex
-from collections import Sequence, Callable
+try:
+    from collections.abc import Sequence, Callable
+except ImportError:
+    from collections import Sequence, Callable
 import itertools
 from numbers import Number
 
