@@ -708,10 +708,10 @@ def run_vpn(args):
                         log.info("VPN connected")
                         connected = True
                     else:
-                        log.warn("Ignoring unknown sub state: %s", sub)
+                        log.warning("Ignoring unknown sub state: %s", sub)
                 elif t == "auth":
                     if connected:
-                        log.warn("Auth request (%s) whilst connected", sub)
+                        log.warning("Auth request (%s) whilst connected", sub)
                     if not current_auth:
                         # TODO: more info
                         log.error("No current auth state")
@@ -745,7 +745,7 @@ def run_vpn(args):
     finally:
         child.close(True)
     if child.exitstatus:
-        log.warn("VPN exited with an error: %d", child.exitstatus)
+        log.warning("VPN exited with an error: %d", child.exitstatus)
     return child.exitstatus
 
 
