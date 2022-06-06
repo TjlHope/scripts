@@ -25,6 +25,7 @@ import socket
 import getpass
 
 import pexpect
+import subprocess
 
 
 class WithLogger:
@@ -231,7 +232,7 @@ class _ActionResult:
         return iter(self.params())
 
     def __bool__(self):
-        return self.values and self.value
+        return bool(self.values and self.value)
 
     def __str__(self):
         return " ".join([shlex.quote(param) for param in self.params(True)])
@@ -342,7 +343,7 @@ class EnhancedArgumentParser(argparse.ArgumentParser, WithLogger):
 
     def read_args_from_file(self, args_file):
         self._enter('read_args_from_file', args_file)
-        return shlex.split(args_file)
+        return shlex.split(args_file, comments=True)
 
     def convert_arg_line_to_args(self, arg_line):
         self._enter('convert_arg_line_to_args', arg_line)
@@ -633,6 +634,10 @@ def parse(args):
                               help=("can be specified multiple times, "
                                     "either <log_level> or "
                                     "<logger_name>:<log_level>"))
+    system_group.add_argument("--on-ip", metavar="<cmd>",
+                              help=("command to run when charon-cmd installs "
+                                    "a virtual IP, receives a single argument "
+                                    "of the IP"))
 
     return parser.parse_arg_groups(args)
 
@@ -661,6 +666,7 @@ CHARON_CMD_EXPECT_TYPES = {
     "Preshared Key: ": ("auth", "psk"),
     "EAP password: ": ("auth", "password"),
     "EAP PIN: ": ("auth", "pin"),
+    "[IKE] installing new virtual IP ": ("config", "ip"),
 }
 CHARON_CMD_EXPECT = list(CHARON_CMD_EXPECT_TYPES.keys())
 
@@ -731,6 +737,23 @@ def run_vpn(args):
                     child.sendline(val)
                 elif t == "msg":
                     last_msg = child.readline().strip()
+                elif t == "config":
+                    if sub == "ip":
+                        ip = child.readline().strip()
+                        if not connected:
+                            log.warning(("IP address (%s) installed when not "
+                                         "connected"), ip)
+                        if args.system_options.on_ip:
+                            try:
+                                subprocess.run(
+                                    [args.system_options.on_ip.value, ip],
+                                    check=True, timeout=10)
+                            except subprocess.TimeoutExpired as e:
+                                log.warning("Timed out waiting %ds for: %s",
+                                            e.timeout, e.cmd)
+                            except subprocess.CalledProcessError as e:
+                                log.watning("Failed (%d) to run: %s",
+                                            e.returncode, e.cmd)
             except pexpect.TIMEOUT:
                 continue
             except pexpect.EOF:
