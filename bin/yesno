@@ -1,18 +1,20 @@
 #!/bin/sh
-# vi: sw=2 sts=4 ts=8 et
-[ -z "${SH_OPTS-}" ] || set "-${SH_OPTS#-}"
+# vi: sw=4 sts=4 ts=8 et
+[ "${__sourced_yesno-}" = yesno ] && return ||
+    __sourced_yesno=yesno
 
 yesno() {
-  case "${1-}" in
-    [Yy]|[Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|1)   true;;
-    [Nn]|[Nn][Oo]|[Ff][Aa][Ll][Ss][Ee]|0)   false;;
-    "${2-}")        [ "${2+set}" = set ] || return 2;;
-    '')                                     return 2;;
-    *)                                      return 3;;
-  esac
+    case "${1-}" in
+        [Yy]|[Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|1)   true;;
+        [Nn]|[Nn][Oo]|[Ff][Aa][Ll][Ss][Ee]|0)   false;;
+        "${2-}")        [ "${2+set}" = set ] || return 2;;
+        '')                                     return 2;;
+        *)                                      return 3;;
+    esac
 }
 yn() { yesno "$@"; }
 
-case "$(basename "$0" .sh)" in
-  yesno|yn) yesno "$@";;
+__yesno_name="$(basename "$0" .sh)"
+case "$__yesno_name" in
+    yesno|yn)   "$__yesno_name" "$@";;
 esac

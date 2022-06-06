@@ -1,0 +1,18 @@
+#!/bin/sh
+# vi: sw=4 sts=4 ts=8 et
+#
+# Helper for checking arguments for -h or --help
+#
+[ "${__sourced_wants_help-}" = wants_help ] && return ||
+    __sourced_wants_help=wants_help
+
+wants_help() {
+    while [ $# -gt 0 ]
+    do  case "$1" in -h|--help) return 0;; esac; shift
+    done; return 1
+}
+
+__wants_help_name="$(basename "$0" .sh)"
+case "$__wants_help_name" in
+    wants_help) "$__wants_help_name" "$@";;
+esac

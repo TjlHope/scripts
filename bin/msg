@@ -4,7 +4,7 @@
 # Helper for message output
 #
 [ "${__sourced_msg-}" = msg ] && return ||
-  __sourced_msg=msg
+    __sourced_msg=msg
 
 msg() {
     # shellcheck disable=2015
