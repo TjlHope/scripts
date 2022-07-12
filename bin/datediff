@@ -1,0 +1,53 @@
+#!/bin/sh
+# vi: sw=4 sts=4 ts=8 et
+#
+# Utility to diff dates
+#
+[ "${__sourced_datediff-}" = datediff ] && return ||
+    __sourced_datediff=datediff
+
+# This can be used as a lib, don't die if we can't source it,
+# just continue and let people see the errors.
+# shellcheck source=SCRIPTDIR/msg
+. msg || :
+# shellcheck source=SCRIPTDIR/wants_help
+. wants_help || :
+
+__datediff_usage() {
+    local s=$? fd=1
+    [ $s -eq 0 ] || fd=2
+    cat >&$fd <<'_EOF'
+Usage: datediff <from> <to>[ result_units]
+
+  from, to      a date string as understood by `date -d`
+  result_units  a unit understood by `units`, default seconds
+                TODO: custom diff logic
+_EOF
+    return $s
+}
+
+date2s() {
+    { [ $# -eq 1 ] && ! wants_help "$@"; } ||
+        err "Usage: date2s <date>" || return
+    date -d"$1" '+%s'
+}
+
+datediff() {
+    { case $# in 2|3) :;; *) false;; esac && ! wants_help "$@"; } ||
+        __datediff_usage || return
+    local from=0 to=0 diff=0 units="s"
+    from="$(date2s "$1")" || err "<from> date unknown" || return
+    to="$(date2s "$2")" || err "<to> date unknown" || return
+    diff=$((to - from))
+    [ -z "${3-}" ] || units="$3"
+    case "$units" in
+        s|sec|secs|second|seconds)
+            echo "$diff s";;
+        *)      units -1v "$diff s" "$units";;
+    esac
+}
+
+__datediff_name="$(basename "$0" .sh)"
+case "$__datediff_name" in
+    datediff)    "$__datediff_name" "$@";;
+esac
