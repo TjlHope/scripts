@@ -1,0 +1,45 @@
+#!/bin/sh
+# vi: sw=4 sts=4 ts=8 et
+[ -z "${SH_OPTS-}" ] || set -"${SH_OPTS#-}"
+
+# TODO: better lib detection
+. msg
+
+join_indented() {
+    [ $# -le 1 ] ||
+        err "Usage: join_indented [sep=|] (stdin to stdout)" || return
+    sed -nEe "
+        /^[ \\t]/{
+            # the line is indented, join it with anything currently held
+            H;
+            # and on to the next one
+            b end;
+        }
+        : output
+        {
+            # the line isn't indented, swap with anything stored previously
+            x;
+            # if it's empty, on to the next one
+            /^\$/ b end;
+            # otherwise, replace all newlines with the separator
+            s/\\r?\\n/${1-|}/g;
+            # and output
+            p;
+        }
+        : end
+        $ {
+            # if this is the last line, get what we're working on
+            g;
+            # if it's nothing, we're done
+            /^$/ b;
+            # else clear the current line (it's already in hold space)
+            s/.*//
+            # and make sure it's output
+            b output;
+        }
+    "
+}
+
+case "$(basename "$0" .sh)" in
+    join[_-]indented)  join_indented "$@";;
+esac
