@@ -9,23 +9,10 @@ set -eu
 : "${CHECK_FILTER-}"    # no
 : "${PING_FORMAT-}"     # awk -va="$a" '{print strftime("%c"),"\t",a,"\t",$0}'
 
-msg() { printf '%s\n' "$@"; }
-err() {
-  # shellcheck disable=2039
-  local s=$?; [ $s -gt 0 ] || s=1
-  msg "$@" >&2
-  return $s
-}
-die() { err "$@" || exit; }
-
-yesno() {
-    case "${1-}" in
-        [Yy]|[Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|1)   true;;
-        [Nn]|[Nn][Oo]|[Ff][Aa][Ll][Ss][Ee]|0)   false;;
-        '')                                     return 2;;
-        *)                                      return 3;;
-    esac
-}
+# shellcheck source=SCRIPTDIR/msg
+. msg
+# shellcheck source=SCRIPTDIR/msg
+. yesno
 
 if [ -z "${PING-}" ]
 then
