@@ -1,0 +1,33 @@
+#!/bin/sh
+# vi: sw=4 sts=4 ts=8 et
+[ "${__sourced_confirm-}" = confirm ] && return ||
+    __sourced_confirm=confirm
+
+# This can be used as a lib, don't die if we can't source it,
+# just continue and let people see the errors.
+# shellcheck source=SCRIPTDIR/msg
+. msg || :
+# shellcheck source=SCRIPTDIR/yesno
+. yesno || :
+
+confirm() {
+    # shellcheck disable=2039
+    local question="$1" default="${2-}" confirm=""
+    while :
+    do
+        printf '%s' "$question"
+        [ -t 0 ] || err " stdin is not a TTY, assuming no..." || return
+        read -r confirm
+        [ -n "$confirm" ] || confirm="$default"
+        { yesno "$confirm" && return; } || case "$?" in
+            1)  return 1;;
+            *)  [ -z "${CONFIRM_ERROR-default}" ] ||
+                echo "${CONFIRM_ERROR:-Please enter Y or N}";;
+        esac
+    done
+}
+
+__confirm_name="$(basename "$0" .sh)"
+case "$__confirm_name" in
+    confirm|yn)   "$__confirm_name" "$@";;
+esac
