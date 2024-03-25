@@ -1,0 +1,56 @@
+#!/bin/sh
+# vi: sw=4 sts=4 ts=8 et
+#
+# Output the container's ID, PID and Name
+#
+[ "${__sourced_docker_pids-}" = docker_pids ] && return ||
+    __sourced_docker_pids=docker_pids
+
+# This can be used as a lib, don't die if we can't source it,
+# just continue and let people see the errors.
+# shellcheck source=SCRIPTDIR/msg
+. msg || :
+# shellcheck source=SCRIPTDIR/wants_help
+. wants_help || :
+
+docker_all_ids() {
+    [ $# -eq 0 ] || err 'Usage: docker_all_ids' || return
+    docker ps --all --format '{{.ID}}'
+}
+
+docker_pid() {
+    [ $# -eq 1 ] && ! wants_help "$@" || 
+        usg "Usage: docker_pid <CONTAINER>" || return
+    docker inspect --format '{{.State.Pid}}' "$1"
+}
+
+__docker_pids_usage() {
+    usg <<'_EOF'
+Usage: docker_pids [-] [CONTAINER[ CONTAINER...]]
+
+Outputs: "ID PID /Name", by default for all containers, or for those provided.
+If outputting to a terminal a header line is printed, and it's aligned in
+columns, otherwise (or if the first argument is '-') it's output tab separated.
+_EOF
+}
+
+docker_pids() {
+    ! wants_help "$@" || __docker_pids_usage || return
+    # shellcheck disable=2039
+    local format=''
+    if [ $# -ge 1 ] && [ "$1" = "-" ] && shift || ! [ -t 1 ]
+    then
+        format='{{.Id|printf "%.10s"}} {{.State.Pid|printf "%6s"}} {{.Name}}'
+        printf '%.10s %6s %s\n' "ID" "PID" "/Name"
+    else
+        format='{{.Id}}{{"\t"}}{{.State.Pid}}{{"\t"}}{{.Name}}'
+    fi
+    # shellcheck disable=2046
+    [ $# -gt 0 ] || set -- $(docker_all_ids) || return
+    docker inspect --format "$format" "$@"
+}
+
+__docker_pids_name="$(basename "$0" .sh)"
+case "$__docker_pids_name" in
+    docker_all_ids|docker_pid|docker_pids)  "$__docker_pids_name" "$@";;
+esac
