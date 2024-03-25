@@ -1,0 +1,59 @@
+#!/bin/sh
+# vi: sw=4 sts=4 ts=8 et
+#
+# A wrapper around https://github.com/staaldraad/turner for
+# Time Limited Long Term Credentials (i.e. common webrtc auth).
+#
+set -eu
+
+: "${SECRET_KEY-}"
+: "${EXPIRY:=1 hour}"
+
+# shellcheck source=SCRIPTDIR/msg
+. msg
+
+command -v turner >/dev/null || {
+    for d in "$(pwd "$(dirname "$0")")" .
+    do
+        [ -x "$d/turner" ] && PATH="$PATH:$d" && break
+    done && command -v turner >/dev/null
+} || {
+    err "Can't find turner, ensure it's in your \$PATH" || return || exit
+}
+
+
+turner_tlltc() {
+    { [ $# -ge 1 ] && [ $# -le 3 ] && ! wants_help "$@"; } ||
+        err "Usage: turner_tlltc <SERVER> [USER=test [secret=\$SECRET_KEY]]" \
+            "  Proxy via TURN using a Time Limited Long Term Credential" \
+            "  (SHA1 HMAC often used for WebRTC" \
+            || return
+    # shellcheck disable=2039
+    local server='' user='' secret='' pass=''
+    server="$1"
+    case "$server" in
+        *:[0-9][0-9]?[0-9]?[0-9]?[0-9]?[0-9]?) :;;
+        *) server="$server:3478";;
+    esac
+    user="$(date -d"$EXPIRY" "+%s"):${2-test}" || return
+    secret="${3-${SECRET_KEY:?}}"
+    pass="$(printf '%s' "$user" |
+        openssl sha1 -hmac "$secret" -binary |
+        base64)"
+    turner -server "$server" -u "$user" -p "$pass" -http -socks5
+}
+
+turner_ssh() {
+    { [ $# -gt 0 ] && ! wants_help "$@"; } ||
+        err "Usage: turner_ssh <ssh cmdline...>" \
+            "  Run ssh with ProxyCommand set to connect via a local turner" \
+            "  SOCK5 proxy." \
+            "  TODO: actually start turner?" \
+            || return
+    ssh -o 'ProxyCommand /usr/bin/nc -x 127.0.0.1:8000 %h %p' "$@"
+}
+
+case "$(basename "$0" .sh)" in
+    turner_tlltc)   turner_tlltc "$@";;
+    turner_ssh)     turner_ssh "$@";;
+esac
