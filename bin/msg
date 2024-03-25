@@ -1,7 +1,7 @@
 #!/bin/sh
 # vi: sw=4 sts=4 ts=8 et
 #
-# Helper for message output
+# Helpers for message output
 #
 [ "${__sourced_msg-}" = msg ] && return ||
     __sourced_msg=msg
@@ -23,8 +23,21 @@ die() {
     err "$@" || exit
 }
 
-__msg_name="$(basename "$0" .sh)"
+# shellcheck disable=2120
+usg() {
+    # shellcheck disable=2039
+    local s=$? fd=1
+    [ $s -eq 0 ] || fd=2
+    # shellcheck disable=2039
+    if [ $# -eq 0 ] || { [ $# -eq 1 ] && [ "$1" = "-" ]; }
+    then cat >&$fd
+    else msg "$@" >&$fd
+    fi
+    return $s
+}
+
+__msg_name="$(basename "$0" .sh 2>/dev/null || :)"
 case "$__msg_name" in
-    msg|err)    "$__msg_name" "$@";;
+    msg|err|usg)    "$__msg_name" "$@";;
     # die only works as a function
 esac
