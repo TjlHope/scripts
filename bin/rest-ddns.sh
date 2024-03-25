@@ -94,7 +94,8 @@ rest_ddns__signal() {
     [ $# -eq 0 ] || err "Usage: rest_ddns__signal" || return
     # TODO: generic signal mechanism?
     [ "$SIGNAL" = -s ] || return 0
-    pkill -HUP -x dnsmasq || err "Failed to signal($?) dnsmasq"
+    # shellcheck disable=2046
+    kill -HUP $(pidof dnsmasq) || err "Failed to signal($?) dnsmasq"
 }
 
 rest_ddns__delete() {
@@ -120,7 +121,8 @@ rest_ddns__update() {
         host="${1%%:*}" ip="${1#*:}"
         if [ -n "$ip" ]
         then
-            printf '%s\t%s.%s\n' "$ip" "$host" "$ZONE" > "$DIR/$host.conf" ||
+            printf '%s\t%s.%s %s\n' "$ip" "$host" "$ZONE" "$host" \
+                > "$DIR/$host.conf" ||
                 err "Failed to update($?): $1" || s=$((s+1))
         else
             rest_ddns__delete "$host"
