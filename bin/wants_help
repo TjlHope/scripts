@@ -8,7 +8,7 @@
 
 wants_help() {
     while [ $# -gt 0 ]
-    do  case "$1" in -h|--help) return 0;; esac; shift
+    do  case "$1" in -h|--help) return 0;; --) break;; esac; shift
     done; return 1
 }
 
